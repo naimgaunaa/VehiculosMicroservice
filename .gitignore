@@ -1,0 +1,8 @@
+.env
+target/
+.idea/
+.vscode/
+*.log
+.agents
+.claude
+CLAUDE.md
