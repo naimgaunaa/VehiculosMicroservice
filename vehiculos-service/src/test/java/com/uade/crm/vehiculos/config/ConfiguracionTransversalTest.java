@@ -1,5 +1,6 @@
 package com.uade.crm.vehiculos.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -8,31 +9,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.boot.actuate.health.CompositeHealth;
+import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.boot.actuate.health.Status;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.uade.crm.vehiculos.PropiedadesDePrueba;
+import com.uade.crm.vehiculos.PruebaIntegracion;
 
 /**
- * Contexto completo sin base de datos: Actuator, OpenAPI y filtro. Mientras no haya persistencia se
- * excluyen DataSource, JPA y Flyway; al llegar la etapa de persistencia los tests de integración
- * usarán Testcontainers y este puede apoyarse en ellos.
+ * Contexto completo contra PostgreSQL de Testcontainers: Actuator (incluida la base en el health), OpenAPI
+ * y filtro.
  */
-@SpringBootTest
+@PruebaIntegracion
 @AutoConfigureMockMvc
-@PropiedadesDePrueba
-@TestPropertySource(properties = {
-        "spring.flyway.enabled=false",
-        "spring.autoconfigure.exclude="
-                + "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
-                + "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,"
-                + "org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration"
-})
 class ConfiguracionTransversalTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private HealthEndpoint healthEndpoint;
 
     @Test
     void actuatorExponeHealthConElCorrelationId() throws Exception {
@@ -40,6 +36,15 @@ class ConfiguracionTransversalTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"))
                 .andExpect(header().exists("X-Correlation-Id"));
+    }
+
+    /** La respuesta HTTP no detalla componentes (no se expone), así que se consulta el endpoint por dentro. */
+    @Test
+    void healthIncluyeLaBaseDeDatos() {
+        CompositeHealth salud = (CompositeHealth) healthEndpoint.health();
+
+        assertThat(salud.getComponents()).containsKey("db");
+        assertThat(salud.getComponents().get("db").getStatus()).isEqualTo(Status.UP);
     }
 
     @Test

@@ -1,0 +1,250 @@
+package com.uade.crm.vehiculos.infrastructure.persistence;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.uade.crm.vehiculos.PruebaIntegracion;
+import com.uade.crm.vehiculos.RelojDePrueba;
+import com.uade.crm.vehiculos.domain.model.Caja;
+import com.uade.crm.vehiculos.domain.model.PrecioHistorico;
+import com.uade.crm.vehiculos.domain.model.Vehiculo;
+import com.uade.crm.vehiculos.domain.port.VehiculoRepositorio;
+
+import jakarta.persistence.EntityManager;
+
+/**
+ * Adaptador JPA contra PostgreSQL real. Antes de cada lectura se vacía la sesión de Hibernate
+ * ({@link #sincronizar()}) para que el mapeo se compruebe contra la base y no contra el caché.
+ */
+@PruebaIntegracion
+@Import(VehiculoRepositorioJpaTest.RelojConfig.class)
+@Transactional
+class VehiculoRepositorioJpaTest {
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class RelojConfig {
+
+        @Bean
+        @Primary
+        RelojDePrueba relojDePrueba() {
+            return new RelojDePrueba();
+        }
+    }
+
+    @Autowired
+    private VehiculoRepositorio repositorio;
+
+    @Autowired
+    private VehiculoJpaRepository jpa;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Autowired
+    private RelojDePrueba reloj;
+
+    @BeforeEach
+    void reiniciarReloj() {
+        reloj.reiniciar();
+    }
+
+    private Vehiculo.Builder unVehiculo() {
+        return Vehiculo.builder(reloj)
+                .marca("Toyota")
+                .modelo("Corolla")
+                .anio(2021)
+                .kilometraje(45000)
+                .precio(new BigDecimal("18500000.00"))
+                .caja(Caja.AUTOMATICA);
+    }
+
+    private void sincronizar() {
+        entityManager.flush();
+        entityManager.clear();
+    }
+
+    @Test
+    void guardaYLeeTodosLosCampos() {
+        Vehiculo original = unVehiculo()
+                .version("XEI CVT")
+                .fotoUrl("https://ejemplo.test/fotos/corolla.jpg")
+                .disponible(false)
+                .build();
+
+        repositorio.guardar(original);
+        sincronizar();
+        Vehiculo leido = repositorio.buscarPorId(original.id()).orElseThrow();
+
+        assertThat(leido.id()).isEqualTo(original.id());
+        assertThat(leido.marca()).isEqualTo("Toyota");
+        assertThat(leido.modelo()).isEqualTo("Corolla");
+        assertThat(leido.version()).contains("XEI CVT");
+        assertThat(leido.anio()).isEqualTo(2021);
+        assertThat(leido.kilometraje()).isEqualTo(45000);
+        assertThat(leido.precio()).isEqualByComparingTo("18500000");
+        assertThat(leido.disponible()).isFalse();
+        assertThat(leido.caja()).isEqualTo(Caja.AUTOMATICA);
+        assertThat(leido.fotoUrl()).contains("https://ejemplo.test/fotos/corolla.jpg");
+    }
+
+    @Test
+    void guardaYLeeSinVersionNiFoto() {
+        Vehiculo original = unVehiculo().caja(Caja.MANUAL).build();
+
+        repositorio.guardar(original);
+        sincronizar();
+        Vehiculo leido = repositorio.buscarPorId(original.id()).orElseThrow();
+
+        assertThat(leido.version()).isEmpty();
+        assertThat(leido.fotoUrl()).isEmpty();
+        assertThat(leido.disponible()).isTrue();
+        assertThat(leido.caja()).isEqualTo(Caja.MANUAL);
+    }
+
+    @Test
+    void buscarPorIdDeUnaUnidadInexistenteDevuelveVacio() {
+        assertThat(repositorio.buscarPorId(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void elAltaFijaCreadoEnYActualizadoEnConElReloj() {
+        Vehiculo vehiculo = unVehiculo().build();
+
+        repositorio.guardar(vehiculo);
+        sincronizar();
+        VehiculoEntity entidad = jpa.findById(vehiculo.id()).orElseThrow();
+
+        assertThat(entidad.getCreadoEn()).isEqualTo(RelojDePrueba.INICIO);
+        assertThat(entidad.getActualizadoEn()).isEqualTo(RelojDePrueba.INICIO);
+    }
+
+    @Test
+    void actualizarConservaCreadoEnYRenuevaActualizadoEn() {
+        Vehiculo vehiculo = unVehiculo().build();
+        repositorio.guardar(vehiculo);
+        sincronizar();
+        Instant alta = reloj.instant();
+
+        reloj.avanzar(Duration.ofHours(3));
+        Vehiculo recuperado = repositorio.buscarPorId(vehiculo.id()).orElseThrow();
+        recuperado.actualizarPrecio(new BigDecimal("17900000.50"));
+        recuperado.cambiarDisponibilidad(false);
+        recuperado.asignarFoto("https://ejemplo.test/fotos/nueva.png");
+        repositorio.guardar(recuperado);
+        sincronizar();
+
+        VehiculoEntity entidad = jpa.findById(vehiculo.id()).orElseThrow();
+        assertThat(entidad.getCreadoEn()).isEqualTo(alta);
+        assertThat(entidad.getActualizadoEn()).isEqualTo(alta.plus(Duration.ofHours(3)));
+        assertThat(entidad.getPrecio()).isEqualByComparingTo("17900000.50");
+        assertThat(entidad.isDisponible()).isFalse();
+        assertThat(entidad.getFotoUrl()).isEqualTo("https://ejemplo.test/fotos/nueva.png");
+        assertThat(jpa.count()).isEqualTo(1);
+    }
+
+    @Test
+    void buscarSinFiltroDevuelveTodasDeLaMasNuevaALaMasVieja() {
+        Vehiculo primero = unVehiculo().marca("Ford").build();
+        repositorio.guardar(primero);
+        reloj.avanzar(Duration.ofMinutes(1));
+        Vehiculo segundo = unVehiculo().marca("Fiat").disponible(false).build();
+        repositorio.guardar(segundo);
+        reloj.avanzar(Duration.ofMinutes(1));
+        Vehiculo tercero = unVehiculo().marca("Honda").build();
+        repositorio.guardar(tercero);
+        sincronizar();
+
+        List<Vehiculo> todas = repositorio.buscar(null);
+
+        assertThat(todas).extracting(Vehiculo::id)
+                .containsExactly(tercero.id(), segundo.id(), primero.id());
+    }
+
+    @Test
+    void buscarFiltraPorDisponible() {
+        Vehiculo disponible1 = unVehiculo().marca("Ford").build();
+        Vehiculo disponible2 = unVehiculo().marca("Fiat").build();
+        Vehiculo vendido = unVehiculo().marca("Honda").disponible(false).build();
+        repositorio.guardar(disponible1);
+        repositorio.guardar(disponible2);
+        repositorio.guardar(vendido);
+        sincronizar();
+
+        assertThat(repositorio.buscar(true)).extracting(Vehiculo::id)
+                .containsExactlyInAnyOrder(disponible1.id(), disponible2.id());
+        assertThat(repositorio.buscar(false)).extracting(Vehiculo::id).containsExactly(vendido.id());
+        assertThat(repositorio.buscar(null)).hasSize(3);
+    }
+
+    @Test
+    void buscarSinDatosDevuelveListaVacia() {
+        assertThat(repositorio.buscar(true)).isEmpty();
+        assertThat(repositorio.buscar(null)).isEmpty();
+    }
+
+    @Test
+    void elHistorialSeDevuelveDelMasNuevoAlMasViejo() {
+        Vehiculo vehiculo = unVehiculo().build();
+        repositorio.guardar(vehiculo);
+        Instant t0 = reloj.instant();
+        repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("18500000.00"), t0);
+        repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("17000000.00"), t0.plus(Duration.ofDays(60)));
+        repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("17500000.50"), t0.plus(Duration.ofDays(30)));
+        sincronizar();
+
+        List<PrecioHistorico> historial = repositorio.historialDePrecios(vehiculo.id());
+
+        assertThat(historial).extracting(PrecioHistorico::vigenteDesde)
+                .containsExactly(t0.plus(Duration.ofDays(60)), t0.plus(Duration.ofDays(30)), t0);
+        assertThat(historial).extracting(PrecioHistorico::precio)
+                .usingComparatorForType(BigDecimal::compareTo, BigDecimal.class)
+                .containsExactly(new BigDecimal("17000000.00"), new BigDecimal("17500000.50"),
+                        new BigDecimal("18500000.00"));
+    }
+
+    @Test
+    void elHistorialEstaAisladoPorVehiculo() {
+        Vehiculo uno = unVehiculo().build();
+        Vehiculo otro = unVehiculo().marca("Fiat").build();
+        repositorio.guardar(uno);
+        repositorio.guardar(otro);
+        repositorio.registrarPrecio(uno.id(), new BigDecimal("1000000"), reloj.instant());
+        repositorio.registrarPrecio(otro.id(), new BigDecimal("2000000"), reloj.instant());
+        sincronizar();
+
+        assertThat(repositorio.historialDePrecios(uno.id())).hasSize(1);
+        assertThat(repositorio.historialDePrecios(uno.id()).get(0).precio()).isEqualByComparingTo("1000000");
+    }
+
+    @Test
+    void sinFilasElHistorialEstaVacio() {
+        Vehiculo vehiculo = unVehiculo().build();
+        repositorio.guardar(vehiculo);
+        sincronizar();
+
+        assertThat(repositorio.historialDePrecios(vehiculo.id())).isEmpty();
+        assertThat(repositorio.historialDePrecios(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void registrarPrecioDeUnaUnidadInexistenteViolaLaClaveForanea() {
+        assertThatThrownBy(() -> repositorio.registrarPrecio(UUID.randomUUID(), BigDecimal.TEN, reloj.instant()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+}

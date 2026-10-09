@@ -543,8 +543,8 @@ La base, el rol, el schema y el bucket de Supabase ya existen. El orden es:
 El esqueleto arrancó contra Supabase real el 2026-10-08: el session pooler acepta el rol `vehiculos_app`, Flyway creó `vehiculos.flyway_schema_history` (schema vacío, 0 migraciones) y `/actuator/health` respondió `UP`. Lo que quedó para las etapas siguientes:
 
 - **Etapa 4 (persistencia):**
-  - **[A confirmar]** Supabase corre PostgreSQL 17 (el log de arranque dice 17.11), pero la sección 14 y `CLAUDE.md` fijan `postgres:16-alpine` en los tests. Decidir entre pasar `PostgresDePrueba` a `postgres:17-alpine` (y actualizar la sección 14 y `CLAUDE.md`) o mantener 16 y escribir la V1 solo con SQL común a ambas versiones.
-  - `vehiculos.flyway_schema_history` ya existe en la base compartida, creada sin migraciones. La V1 se aplica encima y no debe crear esa tabla. El WARN `No migrations found` del arranque desaparece con la V1.
+  - **[Resuelto en la etapa 4]** Supabase corre PostgreSQL 17 (el log de arranque dice 17.11). `PostgresDePrueba` usa `postgres:17-alpine` y la sección 14 ya lo dice. Falta actualizar la línea de Stack de `CLAUDE.md` (sigue diciendo `postgres:16-alpine`), que no se edita desde acá.
+  - `vehiculos.flyway_schema_history` ya existe en la base compartida, creada sin migraciones. La `V1__vehiculo.sql` no crea esa tabla. El WARN `No migrations found` del arranque desaparece cuando la V1 se aplique en Supabase (ver etapa 9 en los pendientes de la etapa 4).
 - **Etapa 8 (Docker):**
   - `infra/.env.example` no termina en salto de línea. Corregirlo al completarlo para el compose.
   - springdoc queda habilitado: el arranque avisa con WARN que conviene deshabilitarlo en producción, pero Insomnia importa `/v3/api-docs`. No hace falta tocarlo en el TP.
@@ -564,9 +564,9 @@ Especificaciones de la etapa 1 que las etapas siguientes deben respetar:
 `ApiExceptionHandler` ya expone `responder(CodigoError, detalle, request)` y `CodigoError` trae los 8 códigos. Lo que quedó para las etapas siguientes, además de los mapeos de excepciones de dominio que detalla la etapa 3:
 
 - **Etapa 4 (persistencia):**
-  - `ConfiguracionTransversalTest` excluye DataSource, JPA y Flyway porque aún no hay base. Revisarlo cuando existan los tests con Testcontainers.
-  - Los tests de integración reutilizan `@PropiedadesDePrueba` para no depender de las `VEHICULOS_*` del shell.
-  - Con DataSource activo, `/actuator/health` incluye la base: si el proyecto de Supabase está pausado, da `DOWN`, y con él el healthcheck del compose.
+  - **[Resuelto en la etapa 4]** `ConfiguracionTransversalTest` ya no excluye DataSource, JPA ni Flyway: usa `@PruebaIntegracion` (PostgreSQL de Testcontainers) y comprueba que el health incluye la base. No se puede volver a excluirlos: `VehiculoRepositorioJpa` necesita el repositorio Spring Data.
+  - Los tests de integración reutilizan `@PropiedadesDePrueba` (a través de `@PruebaIntegracion`) para no depender de las `VEHICULOS_*` del shell.
+  - Con DataSource activo, `/actuator/health` incluye la base: si el proyecto de Supabase está pausado, da `DOWN`, y con él el healthcheck del compose. La respuesta HTTP solo muestra `status` (no se expone el detalle de los componentes).
 - **Etapa 5 (lectura):** un id de ruta que no es UUID responde hoy 400 `SOLICITUD_INVALIDA` (`MethodArgumentTypeMismatchException`, cubierto por un test). Si se prefiere 422 `VALIDACION`, decidirlo acá.
 - **Etapa 6 (escrituras):**
   - `ClaveServicioInvalidaException` se mapea a `CLAVE_SERVICIO_INVALIDA` 401 con `responder(...)`.
@@ -587,9 +587,9 @@ Especificaciones de la etapa 1 que las etapas siguientes deben respetar:
 El dominio ya está (`Vehiculo`, `Caja`, `PrecioHistorico` y las excepciones). Estas tareas quedaron para las etapas siguientes:
 
 - **Etapa 4 (persistencia):**
-  - `creadoEn` y `actualizadoEn` no están en `Vehiculo`. Los fija la persistencia o el servicio con el `Clock`; hay que decidir dónde en esta etapa. `actualizadoEn` cambia con precio, disponibilidad y foto.
-  - `VehiculoRepositorioJpa.aDominio` reconstruye con `Vehiculo.builder(clock)`, informando `id`. Necesita el `Clock`, así que el adaptador lo recibe por constructor. Un dato guardado con año fuera de rango haría fallar la lectura con `VehiculoInvalidoException`.
-  - Crear el puerto `VehiculoRepositorio` y su `package-info.java` en `domain.port`, y `DominioConfig` con el bean `Clock` (aún no existe).
+  - **[Resuelto en la etapa 4]** `creadoEn` y `actualizadoEn` no están en `Vehiculo`: los fija el adaptador `VehiculoRepositorioJpa` con el `Clock` (alta: ambos; cada `guardar` posterior: conserva `creado_en` y renueva `actualizado_en`).
+  - **[Resuelto en la etapa 4]** `aDominio` reconstruye con `Vehiculo.builder(clock)`, informando `id`; el adaptador recibe el `Clock` por constructor. Sigue siendo cierto que un dato guardado con año fuera de rango hace fallar la lectura con `VehiculoInvalidoException`.
+  - **[Resuelto en la etapa 4]** Puerto `VehiculoRepositorio` con su `package-info.java` en `domain.port` y `DominioConfig` con el bean `Clock` (`Clock.systemUTC()`).
 - **Etapa 5 (lectura):** mapear `VehiculoNoEncontradoException` a `VEHICULO_NO_ENCONTRADO` 404 en `ApiExceptionHandler`, con el patrón `responder(CodigoError, detalle, request)`. Hasta entonces daría 500.
 - **Etapa 6 (alta y actualización):**
   - Mapear `VehiculoInvalidoException` a `VALIDACION` 422. Es la segunda barrera: el DTO valida primero.
@@ -606,6 +606,32 @@ Decisiones de la etapa 3 que las etapas siguientes deben respetar:
 - `marca`, `modelo` y `version` se recortan en el dominio. Una `version` en blanco equivale a ausente.
 - Las invariantes rotas lanzan `VehiculoInvalidoException`, que falla en la primera regla incumplida.
 
+### Pendientes que dejó la etapa 4 (persistencia)
+
+Están hechos: `V1__vehiculo.sql`, `VehiculoEntity`, `PrecioHistorialEntity`, sus repositorios Spring Data, el puerto `VehiculoRepositorio`, el adaptador `VehiculoRepositorioJpa`, `DominioConfig` y los tests con Testcontainers (`PostgresDePrueba`, `@PruebaIntegracion`, `RelojDePrueba`, `MigracionesTest`, `VehiculoRepositorioJpaTest`). **El seed no se hizo**; la V1 todavía no corrió contra Supabase. Lo que quedó para las etapas siguientes:
+
+- **Seed (etapa a definir, sección 9.3):**
+  - Flyway valida que toda migración versionada esté aplicada y en orden. Si el seed fuera `V1000__...` y después se agrega una `V2` de esquema, la base compartida falla al validar (migración resuelta pero no aplicada, con una versión mayor ya aplicada). Recomendación: hacer el seed una **migración repetible e idempotente** (`R__seed_vehiculos.sql`, con `ON CONFLICT (id) DO NOTHING` y ids fijos) en `db/seed`, que corre siempre después de las versionadas.
+  - Contenido: datos ficticios variados (marcas, cajas, años, precios, kilometrajes), al menos una unidad con `disponible = false`, fotos en `NULL` y una fila inicial en `precio_historial` por unidad, con el mismo precio que `vehiculo.precio`. Como el SQL no pasa por el `Clock`, `creado_en`, `actualizado_en` y `vigente_desde` van con valores explícitos y coherentes entre sí.
+  - Antes de activar el perfil `seed` contra Supabase, avisar al equipo: es la base compartida (regla 4 de `CLAUDE.md`).
+- **Etapas 5 y 6 (servicios):**
+  - La transacción de negocio la abre el servicio (`@Transactional`); el adaptador se une a ella. El alta o el `PUT` que cambia el precio llaman a `guardar` y a `registrarPrecio` dentro de la misma transacción.
+  - `registrarPrecio` no comprueba que el precio coincida con `vehiculo.precio`: mantener "la fila más reciente coincide con el precio actual" es responsabilidad del servicio. Tampoco decide si escribir: el servicio compara el precio nuevo con el actual y no registra nada si solo cambia `disponible` o si el precio es igual.
+  - `guardar` renueva `actualizado_en` en cada llamada, aunque no haya cambios. El servicio no debe llamarlo si no cambió nada.
+  - `registrarPrecio` con un `vehiculoId` inexistente lanza `DataIntegrityViolationException` (clave foránea), no `VehiculoNoEncontradoException`: el servicio debe buscar la unidad antes (y ya lo hace para el 404).
+  - `buscar(Boolean)` devuelve las unidades de la más nueva a la más vieja (`creado_en DESC`, desempate por `id`); el doc de la API no define otro orden. `historialDePrecios` va del más nuevo al más viejo.
+  - Un `GET` de una unidad con datos cargados a mano fuera de las invariantes (por ejemplo `anio` fuera de rango) lanza `VehiculoInvalidoException` al leer. Mientras esa excepción no esté mapeada da 500, y cuando la etapa 6 la mapee a `VALIDACION` 422, un `GET` respondería 422 por un dato guardado. Decidir si conviene distinguir "dato de entrada inválido" de "dato guardado inválido".
+- **Etapa 9 (punta a punta):**
+  - **[Verificado el 2026-10-09]** La V1 se aplicó contra Supabase al arrancar con `spring-boot:run` (perfil `local`): tablas e índices creados en el schema `vehiculos` y `/actuator/health` en `UP`. Queda como lista de chequeo para repetirlo en la prueba de punta a punta (sobre el contenedor): que el rol `vehiculos_app` tenga permiso para crear tablas e índices en el schema `vehiculos`, que existan `vehiculo` y `precio_historial` en el dashboard, que `/actuator/health` dé `UP` y que desaparezca el WARN `No migrations found`.
+  - Esa migración ya no se edita una vez mergeada: cualquier cambio de esquema es una `V2` (regla 4 de `CLAUDE.md`).
+- **Pruebas:** los tests de integración necesitan Docker abierto. Usan `postgres:17-alpine` y arrancan un contenedor por ejecución (compartido por todas las clases que comparten contexto). Los tests de repositorio corren dentro de una transacción que se revierte; las consultas nativas en tests deben calificar el schema (`vehiculos.vehiculo`), porque `hibernate.default_schema` solo aplica a las consultas de Hibernate. `RelojDePrueba` es un bean compartido: cada test que lo avanza debe reiniciarlo (`reiniciar()`).
+
+Decisiones de la etapa 4 que las etapas siguientes deben respetar:
+
+- Las entidades y los repositorios Spring Data son de visibilidad de paquete: el resto del servicio solo ve el puerto `VehiculoRepositorio`.
+- `PrecioHistorialEntity` referencia al vehículo por `vehiculoId` (sin relación JPA) y no tiene setters: el historial es de solo agregado.
+- `guardar` y `registrarPrecio` usan `saveAndFlush`, para que las violaciones de restricciones salten en la llamada y no al cerrar la transacción.
+
 ---
 
 ## 14. Tecnologías y dependencias
@@ -613,7 +639,7 @@ Decisiones de la etapa 3 que las etapas siguientes deben respetar:
 | Componente | Tecnología |
 |---|---|
 | Lenguaje y framework | Java 21, Spring Boot 3.5.x |
-| Persistencia | Spring Data JPA, Flyway, PostgreSQL de Supabase en ejecución y `postgres:16-alpine` en los tests |
+| Persistencia | Spring Data JPA, Flyway, PostgreSQL de Supabase en ejecución y `postgres:17-alpine` en los tests (la misma versión mayor que Supabase) |
 | Fotos | Supabase Storage, con `RestClient` de Spring y timeouts |
 | Validación | Bean Validation (`spring-boot-starter-validation`) |
 | Documentación | springdoc-openapi 2.9.1 (`/v3/api-docs`, `/swagger-ui.html`) |
