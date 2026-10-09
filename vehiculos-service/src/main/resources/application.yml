@@ -21,6 +21,15 @@ spring:
     locations: classpath:db/migration
     schemas: vehiculos
 
+# Sin valor por defecto: si falta una variable, Spring falla con "Could not resolve placeholder".
+# Las de Supabase pueden quedar vacías en modo deshabilitado; VehiculosProperties las exige en modo supabase.
+vehiculos:
+  modo-fotos: ${VEHICULOS_FOTOS_MODO}
+  bucket-fotos: ${VEHICULOS_FOTOS_BUCKET}
+  supabase-url: ${VEHICULOS_SUPABASE_URL:}
+  supabase-clave-secreta: ${VEHICULOS_SUPABASE_CLAVE_SECRETA:}
+  clave-escritura: ${VEHICULOS_CLAVE_ESCRITURA}
+
 management:
   endpoints:
     web:
