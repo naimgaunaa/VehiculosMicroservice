@@ -20,6 +20,10 @@ spring:
     enabled: true
     locations: classpath:db/migration
     schemas: vehiculos
+    # Una base que ya recibió el seed (perfil seed) tiene la repetible en flyway_schema_history y, sin ese perfil,
+    # Flyway no la encuentra y falla al validar. Se ignora solo ese caso: una V aplicada que falta sigue fallando.
+    # *:future es el valor por defecto de Flyway y hay que repetirlo porque esta lista lo reemplaza.
+    ignore-migration-patterns: "*:future,repeatable:missing"
 
 # Sin valor por defecto: si falta una variable, Spring falla con "Could not resolve placeholder".
 # Las de Supabase pueden quedar vacías en modo deshabilitado; VehiculosProperties las exige en modo supabase.

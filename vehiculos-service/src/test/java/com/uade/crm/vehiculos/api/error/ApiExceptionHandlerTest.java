@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.uade.crm.vehiculos.PruebaWebMvc;
 
-@PruebaWebMvc(controllers = {})
+@PruebaWebMvc(controllers = ApiExceptionHandlerTest.ControladorDePrueba.class)
 @Import(ApiExceptionHandlerTest.ControladorDePrueba.class)
 class ApiExceptionHandlerTest {
 

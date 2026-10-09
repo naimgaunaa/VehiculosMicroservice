@@ -11,12 +11,18 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.uade.crm.vehiculos.PruebaWebMvc;
 
-@PruebaWebMvc(controllers = {})
+/**
+ * Solo usa rutas inexistentes. Se limita a un controller vacío para no cargar los reales, que piden servicios.
+ */
+@PruebaWebMvc(controllers = CorrelationIdFilterTest.SinRutas.class)
+@Import(CorrelationIdFilterTest.SinRutas.class)
 class CorrelationIdFilterTest {
 
     private static final String HEADER = "X-Correlation-Id";
@@ -67,5 +73,9 @@ class CorrelationIdFilterTest {
         mvc.perform(get("/no-existe").header(HEADER, "abc-123"));
 
         assertThat(MDC.get("correlationId")).isNull();
+    }
+
+    @RestController
+    static class SinRutas {
     }
 }

@@ -36,6 +36,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import com.uade.crm.vehiculos.config.CorrelationIdFilter;
+import com.uade.crm.vehiculos.domain.model.VehiculoNoEncontradoException;
 
 /**
  * Traduce toda excepción a un {@link ProblemDetail} con {@code codigo} estable y {@code correlationId}.
@@ -116,6 +117,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         }
         log.error("Error al procesar {}", ruta(request), ex);
         return responder(CodigoError.ERROR_INTERNO, statusCode, DETALLE_INTERNO, headers, request, null);
+    }
+
+    @ExceptionHandler(VehiculoNoEncontradoException.class)
+    public ResponseEntity<Object> handleVehiculoNoEncontrado(VehiculoNoEncontradoException ex, WebRequest request) {
+        return responder(CodigoError.VEHICULO_NO_ENCONTRADO, ex.getMessage(), request);
     }
 
     @ExceptionHandler(Exception.class)
