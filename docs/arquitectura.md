@@ -141,7 +141,7 @@ Todo error responde `application/problem+json` (`ProblemDetail`), con `codigo` e
 |---|---|---|
 | `VALIDACION` | 422 | Falla de Bean Validation, o un valor que no se puede convertir al tipo del campo (por ejemplo un enum fuera de rango). Incluye `errores` con `campo` y `mensaje` |
 | `JSON_INVALIDO` | 400 | Cuerpo mal formado |
-| `SOLICITUD_INVALIDA` | 400 | Error 4xx que resuelve Spring MVC (método no permitido, ruta inexistente) |
+| `SOLICITUD_INVALIDA` | 400 (o el 4xx que resuelve Spring) | Error 4xx que resuelve Spring MVC. Conserva su status real: 405 método no permitido, 404 ruta inexistente, 415 tipo de contenido no soportado. Un id de ruta que no es UUID da 400 |
 | `CLAVE_SERVICIO_INVALIDA` | 401 | Falta `X-Api-Key` o no coincide. Se evalúa antes de validar el cuerpo |
 | `ERROR_INTERNO` | 500 | Error no controlado. Se loguea con la excepción y se responde sin detalle |
 | `VEHICULO_NO_ENCONTRADO` | 404 | El id no existe |
@@ -537,6 +537,29 @@ La base, el rol, el schema y el bucket de Supabase ya existen. El orden es:
 7. Fotos: puerto `FotoStorage`, `SupabaseFotoStorage`, `FotoStorageDeshabilitado` y el endpoint de carga.
 8. Docker: Dockerfile y compose.
 9. Prueba de punta a punta con Insomnia sobre el contenedor.
+
+### Pendientes que dejó la etapa 2 (transversal)
+
+`ApiExceptionHandler` ya expone `responder(CodigoError, detalle, request)` y `CodigoError` trae los 8 códigos. Lo que quedó para las etapas siguientes, además de los mapeos de excepciones de dominio que detalla la etapa 3:
+
+- **Etapa 4 (persistencia):**
+  - `ConfiguracionTransversalTest` excluye DataSource, JPA y Flyway porque aún no hay base. Revisarlo cuando existan los tests con Testcontainers.
+  - Los tests de integración reutilizan `@PropiedadesDePrueba` para no depender de las `VEHICULOS_*` del shell.
+  - Con DataSource activo, `/actuator/health` incluye la base: si el proyecto de Supabase está pausado, da `DOWN`, y con él el healthcheck del compose.
+- **Etapa 5 (lectura):** un id de ruta que no es UUID responde hoy 400 `SOLICITUD_INVALIDA` (`MethodArgumentTypeMismatchException`, cubierto por un test). Si se prefiere 422 `VALIDACION`, decidirlo acá.
+- **Etapa 6 (escrituras):**
+  - `ClaveServicioInvalidaException` se mapea a `CLAVE_SERVICIO_INVALIDA` 401 con `responder(...)`.
+  - El interceptor compara `VehiculosProperties.claveEscritura()` en tiempo constante (`MessageDigest.isEqual`).
+  - Anotar las operaciones de escritura con `@SecurityRequirement(name = OpenApiConfig.ESQUEMA_CLAVE_SERVICIO)`. El esquema existe en `OpenApiConfig` pero ninguna operación lo usa, así que Swagger todavía no manda `X-Api-Key`.
+- **Etapa 7 (fotos):**
+  - Spring limita las subidas a 1 MB por defecto. Para que el límite de 2 MB lo aplique el servicio (422 `FOTO_INVALIDA`), subir `spring.servlet.multipart.max-file-size` y `max-request-size`, y mapear `MaxUploadSizeExceededException` a `FOTO_INVALIDA`. Si no, una foto de 1,5 MB falla antes de llegar al servicio.
+  - Elegir el `FotoStorage` con `VehiculosProperties.modoFotos()` (enum). No usar `@ConditionalOnProperty(havingValue = "supabase")`: distingue mayúsculas y `VEHICULOS_FOTOS_MODO=SUPABASE` dejaría el contexto sin bean.
+  - Falta el test de la sección 12 que verifica que ni la clave de Supabase ni la de escritura aparecen en los logs (hoy solo se prueba `toString`). Al loguear errores de `RestClient`, no volcar headers (`apikey`).
+- **Etapa 8 (Docker):**
+  - En el compose, `VEHICULOS_SUPABASE_URL` y `VEHICULOS_SUPABASE_CLAVE_SECRETA` van con `${VAR:-}` y no con `${VAR:?}`: son opcionales en modo `deshabilitado`.
+  - El perfil `docker` de la sección 10 no existe (solo hay `application-local.yml`): crear `application-docker.yml` o confirmar que las variables del compose alcanzan.
+  - `VehiculosProperties` no valida `VEHICULOS_DB_*` (las resuelve `spring.datasource`). Un `.env` copiado de `.env.example` sin completar el host falla recién al conectar.
+- **Etapa 9 (punta a punta):** la etapa 2 se probó solo con MockMvc. Falta ejecutar con Supabase real: `curl` a `/actuator/health` y a una ruta inexistente con `X-Correlation-Id`, y comprobar que sin `VEHICULOS_CLAVE_ESCRITURA` el servicio no arranca.
 
 ### Pendientes que dejó la etapa 3 (dominio)
 
