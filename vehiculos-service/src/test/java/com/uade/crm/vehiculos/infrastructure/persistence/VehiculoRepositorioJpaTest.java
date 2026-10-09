@@ -17,6 +17,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.uade.crm.vehiculos.PruebaIntegracion;
@@ -217,8 +219,8 @@ class VehiculoRepositorioJpaTest {
         repositorio.guardar(vehiculo);
         Instant t0 = reloj.instant();
         repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("18500000.00"), t0);
-        repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("17000000.00"), t0.plus(Duration.ofDays(60)));
         repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("17500000.50"), t0.plus(Duration.ofDays(30)));
+        repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("17000000.00"), t0.plus(Duration.ofDays(60)));
         sincronizar();
 
         List<PrecioHistorico> historial = repositorio.historialDePrecios(vehiculo.id());
@@ -246,12 +248,75 @@ class VehiculoRepositorioJpaTest {
     }
 
     @Test
+    void registrarPrecioEnElMismoInstanteQueLaUltimaFilaFalla() {
+        Vehiculo vehiculo = unVehiculo().build();
+        repositorio.guardar(vehiculo);
+        repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("18500000.00"), reloj.instant());
+
+        assertThatThrownBy(() -> repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("17000000.00"), reloj.instant()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(vehiculo.id().toString());
+        sincronizar();
+        assertThat(repositorio.historialDePrecios(vehiculo.id())).hasSize(1);
+    }
+
+    @Test
+    void registrarPrecioAnteriorALaUltimaFilaFalla() {
+        Vehiculo vehiculo = unVehiculo().build();
+        repositorio.guardar(vehiculo);
+        Instant t0 = reloj.instant();
+        repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("18500000.00"), t0.plus(Duration.ofDays(1)));
+
+        assertThatThrownBy(() -> repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("17000000.00"), t0))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void registrarPrecioUnMicrosegundoDespuesDeLaUltimaFilaSeAcepta() {
+        Vehiculo vehiculo = unVehiculo().build();
+        repositorio.guardar(vehiculo);
+        Instant t0 = reloj.instant();
+        repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("18500000.00"), t0);
+        repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("17000000.00"), t0.plusNanos(1_000));
+        sincronizar();
+
+        assertThat(repositorio.historialDePrecios(vehiculo.id()).get(0).precio()).isEqualByComparingTo("17000000");
+    }
+
+    @Test
     void sinFilasElHistorialEstaVacio() {
         Vehiculo vehiculo = unVehiculo().build();
         repositorio.guardar(vehiculo);
         sincronizar();
 
         assertThat(repositorio.historialDePrecios(vehiculo.id())).isEmpty();
+        assertThat(repositorio.historialDePrecios(UUID.randomUUID())).isEmpty();
+    }
+
+    /** Sin la transacción del test: el caso de uso que se olvide de abrir una falla en vez de commitear a medias. */
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void guardarFueraDeUnaTransaccionFallaSinEscribir() {
+        Vehiculo vehiculo = unVehiculo().build();
+
+        assertThatThrownBy(() -> repositorio.guardar(vehiculo))
+                .isInstanceOf(IllegalTransactionStateException.class);
+        assertThat(repositorio.buscarPorId(vehiculo.id())).isEmpty();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void registrarPrecioFueraDeUnaTransaccionFalla() {
+        assertThatThrownBy(() -> repositorio.registrarPrecio(UUID.randomUUID(), BigDecimal.TEN, reloj.instant()))
+                .isInstanceOf(IllegalTransactionStateException.class);
+    }
+
+    /** Las lecturas abren su propia transacción de solo lectura si no hay una. */
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void lasLecturasNoExigenTransaccion() {
+        assertThat(repositorio.buscar(null)).isEmpty();
+        assertThat(repositorio.buscarPorId(UUID.randomUUID())).isEmpty();
         assertThat(repositorio.historialDePrecios(UUID.randomUUID())).isEmpty();
     }
 

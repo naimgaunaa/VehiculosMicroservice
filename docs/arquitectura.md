@@ -624,7 +624,8 @@ Están hechos: `V1__vehiculo.sql`, `VehiculoEntity`, `PrecioHistorialEntity`, su
 - **Etapas 5 y 6 (servicios):**
   - El dominio normaliza `precio` a 2 decimales, así que `VehiculoResponse` y `PrecioResponse` serializarían `10000000.00`, mientras los ejemplos de la sección 5.3 muestran `10000000`. Decidirlo en la etapa 5: actualizar los ejemplos o quitar los ceros al serializar (sin pasar el monto a texto: en JSON viaja como número).
   - Comparar precios con `compareTo`, nunca con `equals`: `10500000` y `10500000.00` son distintos para `equals`. Igual el dominio normaliza a escala 2 en el Builder y en `actualizarPrecio`, así que dos precios del dominio comparan bien.
-  - La transacción de negocio la abre el servicio (`@Transactional`); el adaptador se une a ella. El alta o el `PUT` que cambia el precio llaman a `guardar` y a `registrarPrecio` dentro de la misma transacción.
+  - La transacción de negocio la abre el servicio (`@Transactional`); el adaptador se une a ella. El alta o el `PUT` que cambia el precio llaman a `guardar` y a `registrarPrecio` dentro de la misma transacción. `guardar` y `registrarPrecio` son `MANDATORY`: si el servicio no abre la transacción, fallan con `IllegalTransactionStateException` (500) en vez de commitear por separado. Las lecturas abren la suya de solo lectura si no hay una.
+  - Test de atomicidad en la etapa 6: sin `@Transactional` en el test, forzar que falle la escritura del historial después de `guardar` (por ejemplo con un `VehiculoRepositorio` espía de Mockito o un precio que viole el `CHECK`) y comprobar que la unidad no quedó en la base.
   - `registrarPrecio` no comprueba que el precio coincida con `vehiculo.precio`: mantener "la fila más reciente coincide con el precio actual" es responsabilidad del servicio. Tampoco decide si escribir: el servicio compara el precio nuevo con el actual y no registra nada si solo cambia `disponible` o si el precio es igual.
   - `guardar` renueva `actualizado_en` en cada llamada, aunque no haya cambios. El servicio no debe llamarlo si no cambió nada.
   - `registrarPrecio` con un `vehiculoId` inexistente lanza `DataIntegrityViolationException` (clave foránea), no `VehiculoNoEncontradoException`: el servicio debe buscar la unidad antes (y ya lo hace para el 404).
@@ -640,6 +641,7 @@ Decisiones de la etapa 4 que las etapas siguientes deben respetar:
 - Las entidades y los repositorios Spring Data son de visibilidad de paquete: el resto del servicio solo ve el puerto `VehiculoRepositorio`.
 - `PrecioHistorialEntity` referencia al vehículo por `vehiculoId` (sin relación JPA) y no tiene setters: el historial es de solo agregado.
 - `guardar` y `registrarPrecio` usan `saveAndFlush`, para que las violaciones de restricciones salten en la llamada y no al cerrar la transacción.
+- `guardar` y `registrarPrecio` exigen una transacción abierta (`Propagation.MANDATORY`); las lecturas son `readOnly` y no la exigen.
 
 ---
 

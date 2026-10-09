@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.uade.crm.vehiculos.domain.model.PrecioHistorico;
@@ -20,9 +21,12 @@ import com.uade.crm.vehiculos.domain.port.VehiculoRepositorio;
  * porque el dominio no los modela. Lee reconstruyendo con {@code Vehiculo.builder(clock)}, que revalida las
  * invariantes: un dato guardado fuera de ellas (por ejemplo un año fuera de rango) falla con
  * {@code VehiculoInvalidoException}.
+ *
+ * <p>Las escrituras exigen una transacción abierta ({@code MANDATORY}): la abre el caso de uso, para que el alta
+ * o el cambio de precio y su fila de historial sean atómicos. Sin ella fallan con
+ * {@code IllegalTransactionStateException} en vez de commitear cada una por separado.
  */
 @Repository
-@Transactional
 class VehiculoRepositorioJpa implements VehiculoRepositorio {
 
     /** Más nuevo primero; el id desempata para que el orden sea estable. */
@@ -54,6 +58,7 @@ class VehiculoRepositorioJpa implements VehiculoRepositorio {
     }
 
     @Override
+    @Transactional(propagation = Propagation.MANDATORY)
     public Vehiculo guardar(Vehiculo vehiculo) {
         Instant ahora = clock.instant();
         VehiculoEntity entidad = vehiculos.findById(vehiculo.id()).orElseGet(() -> {
@@ -67,7 +72,15 @@ class VehiculoRepositorioJpa implements VehiculoRepositorio {
     }
 
     @Override
+    @Transactional(propagation = Propagation.MANDATORY)
     public void registrarPrecio(UUID vehiculoId, BigDecimal precio, Instant vigenteDesde) {
+        // Con dos filas en el mismo instante el orden del historial quedaría indefinido y no se sabría cuál rige.
+        historial.findFirstByVehiculoIdOrderByVigenteDesdeDesc(vehiculoId)
+                .filter(ultima -> !vigenteDesde.isAfter(ultima.getVigenteDesde()))
+                .ifPresent(ultima -> {
+                    throw new IllegalStateException("El precio del vehículo " + vehiculoId + " no puede regir desde "
+                            + vigenteDesde + ": la última fila del historial rige desde " + ultima.getVigenteDesde());
+                });
         historial.saveAndFlush(new PrecioHistorialEntity(UUID.randomUUID(), vehiculoId, precio, vigenteDesde));
     }
 
