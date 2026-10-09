@@ -6,3 +6,4 @@ target/
 .agents
 .claude
 CLAUDE.md
+ClientMicroservice-dev/
