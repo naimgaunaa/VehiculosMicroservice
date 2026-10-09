@@ -103,6 +103,36 @@ class VehiculoBuilderTest {
         assertThat(valido().precio(new BigDecimal("0.01")).build().precio()).isEqualByComparingTo("0.01");
     }
 
+    /** {@code isEqualTo} y no {@code isEqualByComparingTo}: se comprueba la escala, no solo el valor. */
+    @ParameterizedTest
+    @ValueSource(strings = {"10000000", "10000000.0", "10000000.00", "10000000.000", "1E+7"})
+    void precioSeNormalizaADosDecimales(String precio) {
+        assertThat(valido().precio(new BigDecimal(precio)).build().precio())
+                .isEqualTo(new BigDecimal("10000000.00"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"100.555", "0.001", "10000000.001"})
+    void precioConMasDeDosDecimalesSeRechaza(String precio) {
+        assertThatThrownBy(() -> valido().precio(new BigDecimal(precio)).build())
+                .isInstanceOf(VehiculoInvalidoException.class)
+                .hasMessage("El precio admite como máximo 2 decimales");
+    }
+
+    @Test
+    void precioMaximoDeLaColumnaSeAcepta() {
+        assertThat(valido().precio(new BigDecimal("999999999999.99")).build().precio())
+                .isEqualTo(new BigDecimal("999999999999.99"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1000000000000", "1000000000000.00", "1E+13"})
+    void precioConMasDeDoceDigitosEnterosSeRechaza(String precio) {
+        assertThatThrownBy(() -> valido().precio(new BigDecimal(precio)).build())
+                .isInstanceOf(VehiculoInvalidoException.class)
+                .hasMessage("El precio admite como máximo 12 dígitos enteros");
+    }
+
     @Test
     void kilometrajeNegativoSeRechaza() {
         assertThatThrownBy(() -> valido().kilometraje(-1).build())

@@ -47,9 +47,18 @@ class VehiculoMutadoresTest {
         assertThat(vehiculo.precio()).isEqualByComparingTo("10000000");
     }
 
+    @Test
+    void actualizarPrecioNormalizaADosDecimales() {
+        Vehiculo vehiculo = vehiculo();
+
+        vehiculo.actualizarPrecio(new BigDecimal("10500000"));
+
+        assertThat(vehiculo.precio()).isEqualTo(new BigDecimal("10500000.00"));
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"0", "-1"})
-    void actualizarPrecioRechazaCeroYNegativoSinCambiarElPrecio(String precio) {
+    @ValueSource(strings = {"0", "-1", "100.555", "1000000000000"})
+    void actualizarPrecioRechazaValoresInvalidosSinCambiarElPrecio(String precio) {
         Vehiculo vehiculo = vehiculo();
 
         assertThatThrownBy(() -> vehiculo.actualizarPrecio(new BigDecimal(precio)))

@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.springframework.data.domain.Persistable;
+
 import com.uade.crm.vehiculos.domain.model.Caja;
 
 import jakarta.persistence.Column;
@@ -11,12 +13,21 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
-/** Fila de {@code vehiculo} (migración {@code V1__vehiculo.sql}). Sin {@code @Version}: el último PUT gana. */
+/**
+ * Fila de {@code vehiculo} (migración {@code V1__vehiculo.sql}). Sin {@code @Version}: el último PUT gana.
+ *
+ * <p>Implementa {@link Persistable} porque el id lo asigna el dominio: sin eso Spring Data la toma como
+ * existente y hace {@code merge}, que agrega un SELECT antes del INSERT. {@code getId} e {@code isNew} son
+ * públicos porque los exige la interfaz; la clase sigue siendo de paquete.
+ */
 @Entity
 @Table(name = "vehiculo")
-class VehiculoEntity {
+class VehiculoEntity implements Persistable<UUID> {
 
     @Id
     @Column(name = "id", nullable = false)
@@ -56,11 +67,35 @@ class VehiculoEntity {
     @Column(name = "actualizado_en", nullable = false)
     private Instant actualizadoEn;
 
+    /** Solo en memoria: {@code true} desde {@link #nueva(Instant)} hasta que Hibernate la inserta. */
+    @Transient
+    private boolean nueva;
+
     protected VehiculoEntity() {
     }
 
-    UUID getId() {
+    /** Entidad para un alta: se inserta con {@code persist} y fija {@code creadoEn}. */
+    static VehiculoEntity nueva(Instant creadoEn) {
+        VehiculoEntity entidad = new VehiculoEntity();
+        entidad.nueva = true;
+        entidad.creadoEn = creadoEn;
+        return entidad;
+    }
+
+    @Override
+    public UUID getId() {
         return id;
+    }
+
+    @Override
+    public boolean isNew() {
+        return nueva;
+    }
+
+    @PostPersist
+    @PostLoad
+    void marcarPersistida() {
+        nueva = false;
     }
 
     void setId(UUID id) {
@@ -141,10 +176,6 @@ class VehiculoEntity {
 
     Instant getCreadoEn() {
         return creadoEn;
-    }
-
-    void setCreadoEn(Instant creadoEn) {
-        this.creadoEn = creadoEn;
     }
 
     Instant getActualizadoEn() {
