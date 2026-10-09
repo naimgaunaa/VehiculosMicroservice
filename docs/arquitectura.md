@@ -538,6 +538,27 @@ La base, el rol, el schema y el bucket de Supabase ya existen. El orden es:
 8. Docker: Dockerfile y compose.
 9. Prueba de punta a punta con Insomnia sobre el contenedor.
 
+### Pendientes que dejó la etapa 1 (esqueleto)
+
+El esqueleto arrancó contra Supabase real el 2026-10-08: el session pooler acepta el rol `vehiculos_app`, Flyway creó `vehiculos.flyway_schema_history` (schema vacío, 0 migraciones) y `/actuator/health` respondió `UP`. Lo que quedó para las etapas siguientes:
+
+- **Etapa 4 (persistencia):**
+  - **[A confirmar]** Supabase corre PostgreSQL 17 (el log de arranque dice 17.11), pero la sección 14 y `CLAUDE.md` fijan `postgres:16-alpine` en los tests. Decidir entre pasar `PostgresDePrueba` a `postgres:17-alpine` (y actualizar la sección 14 y `CLAUDE.md`) o mantener 16 y escribir la V1 solo con SQL común a ambas versiones.
+  - `vehiculos.flyway_schema_history` ya existe en la base compartida, creada sin migraciones. La V1 se aplica encima y no debe crear esa tabla. El WARN `No migrations found` del arranque desaparece con la V1.
+- **Etapa 8 (Docker):**
+  - `infra/.env.example` no termina en salto de línea. Corregirlo al completarlo para el compose.
+  - springdoc queda habilitado: el arranque avisa con WARN que conviene deshabilitarlo en producción, pero Insomnia importa `/v3/api-docs`. No hace falta tocarlo en el TP.
+- **Etapa 9 (punta a punta):**
+  - `scripts/cargar-env.ps1` nunca se ejecutó en PowerShell: se desarrolló y probó solo `cargar-env.sh`, en Linux. Probarlo en Windows antes de la demo.
+  - `curl` a `/swagger-ui.html` responde 302 hacia `/swagger-ui/index.html`. Usar `curl -L` o abrirlo en el navegador.
+
+Especificaciones de la etapa 1 que las etapas siguientes deben respetar:
+
+- Los scripts de carga leen `infra/.env` línea por línea: ignoran comentarios y líneas vacías, pelan comillas y un `export` inicial, y aceptan `=` dentro del valor. No expanden `$VAR` ni soportan valores multilínea. Solo imprimen los nombres de las variables, nunca los valores.
+- `cargar-env.sh` hay que cargarlo con `source`; ejecutado como proceso aparte avisa y falla. Las variables viven en esa terminal: cargarlas y correr `mvn` en la misma sesión.
+- Cada variable del `.env` va en su propia línea. Si se pegan dos juntas, la URL queda con texto de más y el arranque falla con `Invalid sslmode value: require...`.
+- `mvn -pl vehiculos-service spring-boot:run` se corre desde la raíz del repo, donde está el POM padre.
+
 ### Pendientes que dejó la etapa 2 (transversal)
 
 `ApiExceptionHandler` ya expone `responder(CodigoError, detalle, request)` y `CodigoError` trae los 8 códigos. Lo que quedó para las etapas siguientes, además de los mapeos de excepciones de dominio que detalla la etapa 3:
@@ -629,5 +650,4 @@ Dependencias Maven de `vehiculos-service`: `spring-boot-starter-web`, `spring-bo
 
 - Avisar al equipo del front que `caja` viaja como `AUTOMATICA` o `MANUAL` y que `/precio` ahora incluye `disponible`.
 - Coordinar con `calificacion` qué hace con una unidad no disponible y si le conviene el historial de precios en lugar de guardar el precio que usó.
-- Confirmar en el primer arranque que el session pooler acepta el rol `vehiculos_app`.
 - Ruta del servicio en el gateway, cuando haya responsable: `Path=/api/vehiculos/**` con `StripPrefix=1` hacia `http://vehiculos:8083`.
