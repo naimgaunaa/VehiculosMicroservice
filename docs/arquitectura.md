@@ -81,8 +81,8 @@ com.uade.crm.vehiculos
 │   └── seguridad      ClaveServicioInterceptor, RequiereClaveServicio, ClaveServicioInvalidaException
 ├── application        ConsultaVehiculoService, AltaVehiculoService, ActualizacionVehiculoService, FotoVehiculoService
 ├── domain
-│   ├── model          Vehiculo (con Builder), Caja, PrecioHistorico, ArchivoFoto, VehiculoNoEncontradoException,
-│   │                  FotoInvalidaException, AlmacenamientoNoDisponibleException
+│   ├── model          Vehiculo (con Builder), Caja, PrecioHistorico, ArchivoFoto, VehiculoInvalidoException,
+│   │                  VehiculoNoEncontradoException, FotoInvalidaException, AlmacenamientoNoDisponibleException
 │   └── port           VehiculoRepositorio, FotoStorage
 ├── infrastructure
 │   ├── persistence    VehiculoEntity, VehiculoJpaRepository, VehiculoRepositorioJpa,
@@ -323,7 +323,7 @@ classDiagram
         -boolean disponible
         -Caja caja
         -String fotoUrl
-        +builder() VehiculoBuilder
+        +builder(Clock) VehiculoBuilder
         +actualizarPrecio(BigDecimal) void
         +cambiarDisponibilidad(boolean) void
         +asignarFoto(String) void
@@ -389,7 +389,7 @@ classDiagram
     FotoVehiculoService --> FotoStorage
 ```
 
-En el código, `VehiculoBuilder` es la clase anidada `Vehiculo.Builder`.
+En el código, `VehiculoBuilder` es la clase anidada `Vehiculo.Builder`. Se obtiene con `Vehiculo.builder(clock)`: el `Clock` es obligatorio porque `build()` lo usa para validar el rango del año. Las invariantes rotas lanzan `VehiculoInvalidoException`.
 
 ---
 
@@ -537,6 +537,30 @@ La base, el rol, el schema y el bucket de Supabase ya existen. El orden es:
 7. Fotos: puerto `FotoStorage`, `SupabaseFotoStorage`, `FotoStorageDeshabilitado` y el endpoint de carga.
 8. Docker: Dockerfile y compose.
 9. Prueba de punta a punta con Insomnia sobre el contenedor.
+
+### Pendientes que dejó la etapa 3 (dominio)
+
+El dominio ya está (`Vehiculo`, `Caja`, `PrecioHistorico` y las excepciones). Estas tareas quedaron para las etapas siguientes:
+
+- **Etapa 4 (persistencia):**
+  - `creadoEn` y `actualizadoEn` no están en `Vehiculo`. Los fija la persistencia o el servicio con el `Clock`; hay que decidir dónde en esta etapa. `actualizadoEn` cambia con precio, disponibilidad y foto.
+  - `VehiculoRepositorioJpa.aDominio` reconstruye con `Vehiculo.builder(clock)`, informando `id`. Necesita el `Clock`, así que el adaptador lo recibe por constructor. Un dato guardado con año fuera de rango haría fallar la lectura con `VehiculoInvalidoException`.
+  - Crear el puerto `VehiculoRepositorio` y su `package-info.java` en `domain.port`, y `DominioConfig` con el bean `Clock` (aún no existe).
+- **Etapa 5 (lectura):** mapear `VehiculoNoEncontradoException` a `VEHICULO_NO_ENCONTRADO` 404 en `ApiExceptionHandler`, con el patrón `responder(CodigoError, detalle, request)`. Hasta entonces daría 500.
+- **Etapa 6 (alta y actualización):**
+  - Mapear `VehiculoInvalidoException` a `VALIDACION` 422. Es la segunda barrera: el DTO valida primero.
+  - Usar `Vehiculo.actualizarPrecio` y `cambiarDisponibilidad` en `ActualizacionVehiculoService`. No reimplementar la regla de precio en el servicio.
+  - Comparar el precio nuevo con el actual para decidir si se escribe en el historial.
+- **Etapa 7 (fotos):**
+  - Mapear `FotoInvalidaException` a `FOTO_INVALIDA` 422 y `AlmacenamientoNoDisponibleException` a `ALMACENAMIENTO_NO_DISPONIBLE` 503.
+  - Crear `ArchivoFoto` y el puerto `FotoStorage`.
+  - Usar `Vehiculo.asignarFoto`.
+
+Decisiones de la etapa 3 que las etapas siguientes deben respetar:
+
+- `Vehiculo.builder(clock)` exige el `Clock`. `build()` genera un `id` si no se informa.
+- `marca`, `modelo` y `version` se recortan en el dominio. Una `version` en blanco equivale a ausente.
+- Las invariantes rotas lanzan `VehiculoInvalidoException`, que falla en la primera regla incumplida.
 
 ---
 
