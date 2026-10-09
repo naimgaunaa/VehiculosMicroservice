@@ -1,0 +1,8 @@
+# Perfil para correr con spring-boot:run contra el Supabase compartido (session pooler, puerto 5432).
+# Las variables salen de infra/.env: cargarlas antes con scripts/cargar-env.sh o scripts/cargar-env.ps1.
+# No tienen valor por defecto: si falta una, el servicio no arranca.
+spring:
+  datasource:
+    url: ${VEHICULOS_DB_URL}
+    username: ${VEHICULOS_DB_USUARIO}
+    password: ${VEHICULOS_DB_CLAVE}
