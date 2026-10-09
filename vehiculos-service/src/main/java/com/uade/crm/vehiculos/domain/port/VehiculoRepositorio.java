@@ -29,7 +29,10 @@ public interface VehiculoRepositorio {
      */
     Vehiculo guardar(Vehiculo vehiculo);
 
-    /** Agrega una fila al historial: {@code precio} rige desde {@code vigenteDesde}. */
+    /**
+     * Agrega una fila al historial: {@code precio} rige desde {@code vigenteDesde}. Falla si {@code vigenteDesde}
+     * no es posterior a la última fila de la unidad: es un error de programación del caso de uso, no de la entrada.
+     */
     void registrarPrecio(UUID vehiculoId, BigDecimal precio, Instant vigenteDesde);
 
     /** Precios que rigieron para la unidad, del más nuevo al más viejo. Vacío si no tiene filas. */

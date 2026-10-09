@@ -17,6 +17,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -253,8 +254,10 @@ class VehiculoRepositorioJpaTest {
         repositorio.guardar(vehiculo);
         repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("18500000.00"), reloj.instant());
 
+        // @Repository traduce la IllegalStateException a la excepción de Spring para mal uso de la API de datos.
         assertThatThrownBy(() -> repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("17000000.00"), reloj.instant()))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidDataAccessApiUsageException.class)
+                .hasRootCauseInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(vehiculo.id().toString());
         sincronizar();
         assertThat(repositorio.historialDePrecios(vehiculo.id())).hasSize(1);
@@ -268,7 +271,8 @@ class VehiculoRepositorioJpaTest {
         repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("18500000.00"), t0.plus(Duration.ofDays(1)));
 
         assertThatThrownBy(() -> repositorio.registrarPrecio(vehiculo.id(), new BigDecimal("17000000.00"), t0))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidDataAccessApiUsageException.class)
+                .hasRootCauseInstanceOf(IllegalStateException.class);
     }
 
     @Test
