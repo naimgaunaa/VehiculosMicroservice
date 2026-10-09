@@ -29,6 +29,9 @@ import com.uade.crm.vehiculos.domain.model.PrecioHistorico;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
 import com.uade.crm.vehiculos.domain.port.VehiculoRepositorio;
 
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
+
 import jakarta.persistence.EntityManager;
 
 /**
@@ -131,6 +134,36 @@ class VehiculoRepositorioJpaTest {
 
         assertThat(guardado.precio()).isEqualTo(new BigDecimal("10000000.00"));
         assertThat(leido.precio()).isEqualTo(guardado.precio());
+    }
+
+    /** El alta consulta una sola vez si la unidad existe y después inserta, sin el SELECT extra de {@code merge}. */
+    @Test
+    void elAltaHaceUnSoloSelectAntesDelInsert() {
+        Vehiculo vehiculo = unVehiculo().build();
+        Statistics estadisticas = entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
+        estadisticas.clear();
+        estadisticas.setStatisticsEnabled(true);
+        try {
+            repositorio.guardar(vehiculo);
+
+            assertThat(estadisticas.getPrepareStatementCount()).isEqualTo(2);
+            assertThat(estadisticas.getEntityInsertCount()).isEqualTo(1);
+        } finally {
+            estadisticas.setStatisticsEnabled(false);
+        }
+    }
+
+    @Test
+    void guardarDosVecesEnLaMismaTransaccionActualizaSinDuplicar() {
+        Vehiculo vehiculo = unVehiculo().build();
+        repositorio.guardar(vehiculo);
+        vehiculo.actualizarPrecio(new BigDecimal("17000000"));
+
+        repositorio.guardar(vehiculo);
+        sincronizar();
+
+        assertThat(jpa.count()).isEqualTo(1);
+        assertThat(repositorio.buscarPorId(vehiculo.id()).orElseThrow().precio()).isEqualByComparingTo("17000000");
     }
 
     @Test

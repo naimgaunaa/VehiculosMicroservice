@@ -61,11 +61,7 @@ class VehiculoRepositorioJpa implements VehiculoRepositorio {
     @Transactional(propagation = Propagation.MANDATORY)
     public Vehiculo guardar(Vehiculo vehiculo) {
         Instant ahora = clock.instant();
-        VehiculoEntity entidad = vehiculos.findById(vehiculo.id()).orElseGet(() -> {
-            VehiculoEntity nueva = new VehiculoEntity();
-            nueva.setCreadoEn(ahora);
-            return nueva;
-        });
+        VehiculoEntity entidad = vehiculos.findById(vehiculo.id()).orElseGet(() -> VehiculoEntity.nueva(ahora));
         aEntidad(vehiculo, entidad);
         entidad.setActualizadoEn(ahora);
         return aDominio(vehiculos.saveAndFlush(entidad), clock);
