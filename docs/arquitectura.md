@@ -49,7 +49,7 @@ Los otros servicios del sistema (`leads`, `clientes`, `calificacion`) son indepe
 - No publica ni consume eventos (no usa Kafka).
 - No maneja datos personales.
 - No tiene autenticación de usuarios. Las escrituras se protegen con `X-Api-Key` (5.2).
-- No tiene pantalla de alta o edición: el alta se hace desde Swagger o Insomnia y la edición solo cambia precio y disponibilidad.
+- No tiene pantalla de alta o edición: el alta se hace desde Swagger o Postman y la edición solo cambia precio y disponibilidad.
 
 ### 1.5 Reglas de arquitectura que aplican
 
@@ -442,7 +442,14 @@ Cada fila de `precio_historial` es un precio que empezó a regir en `vigente_des
 
 ### 9.3 Seed
 
-La carga inicial va en migraciones separadas del esquema (`db/seed/`), que se activan con el perfil `seed` sumando `classpath:db/seed` a `spring.flyway.locations`. Se corre con `SPRING_PROFILES_ACTIVE=local,seed`. Datos ficticios, con variedad de marcas, cajas, años, precios y kilometrajes para probar los filtros del front. Incluir al menos una unidad con `disponible = false`. Las fotos del seed quedan en `NULL`. Cada unidad del seed lleva su fila inicial en `precio_historial`.
+La carga inicial vive en `vehiculos-service/src/main/resources/db/seed/R__seed_vehiculos.sql`, separada de `db/migration/`. Se activa con el perfil `seed`: `application-seed.yml` fija `spring.flyway.locations: classpath:db/migration,classpath:db/seed` (repite `db/migration` porque las listas de YAML se reemplazan, no se mezclan). Se corre con `SPRING_PROFILES_ACTIVE=local,seed`; solo `seed` dejaría al perfil `local` sin cargar y faltaría el datasource.
+
+- **Migración repetible, no versionada.** Flyway valida que toda migración versionada esté aplicada y en orden: un `V1000__seed` haría fallar a la base compartida cuando se agregue una `V2` de esquema. La `R__` corre siempre después de las versionadas y se vuelve a ejecutar solo si cambia su contenido.
+- **Idempotente.** Ids fijos (`a0000000-0000-4000-8000-0000000000NN` para `vehiculo`, `b0000000-...` para `precio_historial`) y `ON CONFLICT (id) DO NOTHING`. No duplica filas, pero tampoco actualiza las ya cargadas: para cambiar un dato sembrado hay que borrar la fila (primero `precio_historial`, después `vehiculo`, porque la FK no tiene `ON DELETE`) y dejar que el seed la recree.
+- **Contenido.** 10 unidades ficticias: Toyota Corolla, Ford Fiesta, Volkswagen Amarok, Chevrolet Onix, Renault Sandero, Peugeot 208, Fiat Cronos, Honda Civic, Nissan Kicks y Citroën C3. Años 2009 a 2025, kilometrajes de 8.000 a 178.000, precios de 7,2 a 52 millones, ambas cajas, `version` presente en algunas y ausente en otras. Dos unidades con `disponible = false` (Sandero y Civic). Todas con `foto_url` en `NULL`.
+- **Historial.** Cada unidad tiene su fila inicial en `precio_historial`, con el mismo precio que `vehiculo.precio` y `vigente_desde` igual a `creado_en`. Como el SQL no pasa por el `Clock`, las fechas son explícitas (septiembre de 2026, una por día, para que el orden `creado_en DESC` del listado sea estable).
+- **Pruebas.** `SeedTest` (contexto propio con `@ActiveProfiles({"test", "seed"})`) comprueba las 10 filas, la variedad, las fotos en `NULL`, el historial y la idempotencia. Ninguna otra clase activa el perfil, así que los demás tests siguen viendo la base vacía.
+- **Base compartida.** Antes de activar `seed` contra Supabase hay que avisar al equipo (regla 4 de `CLAUDE.md`).
 
 ---
 
@@ -461,7 +468,7 @@ Todo por variables de entorno, validado al arrancar con el record `VehiculosProp
 | `VEHICULOS_FOTOS_BUCKET` | `vehiculos-fotos` | Bucket público de Storage |
 | `VEHICULOS_CLAVE_ESCRITURA` | mínimo 32 caracteres | Secreto de los endpoints de escritura (`X-Api-Key`) |
 
-Perfiles: `local` (por defecto, para correr con `spring-boot:run` contra Supabase) y `docker` (el del compose). El schema se fija así:
+Perfiles: `local` (por defecto, para correr con `spring-boot:run` contra Supabase), `docker` (el del compose) y `seed` (se suma a los otros, ver 9.3). El schema se fija así:
 
 ```yaml
 spring:
@@ -483,7 +490,7 @@ Un solo modo: el servicio corre en un contenedor y se conecta a Supabase con las
 
 1. Copiar `infra/.env.example` a `infra/.env` y completar las variables de la sección 10.
 2. `docker compose -f infra/docker-compose.yml up --build`.
-3. Probar en `http://localhost:8083/swagger-ui.html` o con Insomnia.
+3. Probar en `http://localhost:8083/swagger-ui.html` o con Postman.
 
 - `Dockerfile` multi-stage con contexto en la raíz del repo: build con `maven:3.9-eclipse-temurin-21` copiando primero los `pom.xml` para cachear dependencias, y runtime `eclipse-temurin:21-jre` con `curl` para el healthcheck y un usuario sin privilegios. No se usa Maven Wrapper.
 - El compose tiene solo el servicio `vehiculos`: sin Postgres, porque la base está en Supabase, y sin Kafka, porque el servicio no lo usa. Publica el puerto 8083 al host. Su healthcheck consulta `/actuator/health`.
@@ -499,13 +506,13 @@ Un solo modo: el servicio corre en un contenedor y se conecta a Supabase con las
 
 - Unitarias del Builder: cada invariante rechaza el valor inválido y acepta el límite; `caja` ausente falla.
 - Unitarias de los servicios con Mockito.
-- Repositorio y migraciones contra PostgreSQL real con Testcontainers (`PostgresDePrueba` con `@ServiceConnection` y la anotación `@PruebaIntegracion`), incluido el filtro `disponible`.
+- Repositorio y migraciones contra PostgreSQL real con Testcontainers (`PostgresDePrueba` con `@ServiceConnection` y la anotación `@PruebaIntegracion`), incluido el filtro `disponible`. `SeedTest` cubre el seed con el perfil `seed` (sección 9.3).
 - Controllers con MockMvc (`PruebaWebMvc`): códigos de estado, forma del `ProblemDetail` (`codigo`, `correlationId`, `errores`), `X-Api-Key` faltante o inválida (401 antes de validar el cuerpo) y `caja` fuera del enum (422 con los valores aceptados).
 - Fotos con un `FotoStorage` falso: tipo inválido, tamaño excedido y falla del almacenamiento.
 - Historial: el alta y cada `PUT` que cambia el precio agregan una fila; un `PUT` que solo cambia `disponible` no agrega nada.
 - La clave secreta de Supabase y la de escritura no aparecen en ninguna línea de log.
 
-**Manuales con Insomnia.** Base `http://localhost:8083`. Importar `http://localhost:8083/v3/api-docs` genera la colección. Guardar la `X-Api-Key` en un entorno de Insomnia y no dentro de cada request. Casos mínimos:
+**Manuales con Postman.** Base `http://localhost:8083`. Importar `http://localhost:8083/v3/api-docs` genera la colección. Guardar la `X-Api-Key` en un entorno de Postman y no dentro de cada request. Casos mínimos:
 
 | # | Request | Resultado esperado |
 |---|---|---|
@@ -536,18 +543,18 @@ La base, el rol, el schema y el bucket de Supabase ya existen. El orden es:
 6. Alta y actualización de precio y disponibilidad, con `X-Api-Key` y registro en el historial.
 7. Fotos: puerto `FotoStorage`, `SupabaseFotoStorage`, `FotoStorageDeshabilitado` y el endpoint de carga.
 8. Docker: Dockerfile y compose.
-9. Prueba de punta a punta con Insomnia sobre el contenedor.
+9. Prueba de punta a punta con Postman sobre el contenedor.
 
 ### Pendientes que dejó la etapa 1 (esqueleto)
 
 El esqueleto arrancó contra Supabase real el 2026-10-08: el session pooler acepta el rol `vehiculos_app`, Flyway creó `vehiculos.flyway_schema_history` (schema vacío, 0 migraciones) y `/actuator/health` respondió `UP`. Lo que quedó para las etapas siguientes:
 
 - **Etapa 4 (persistencia):**
-  - **[Resuelto en la etapa 4]** Supabase corre PostgreSQL 17 (el log de arranque dice 17.11). `PostgresDePrueba` usa `postgres:17-alpine` y la sección 14 ya lo dice. Falta actualizar la línea de Stack de `CLAUDE.md` (sigue diciendo `postgres:16-alpine`), que no se edita desde acá.
+  - **[Resuelto en la etapa 4]** Supabase corre PostgreSQL 17 (el log de arranque dice 17.11). `PostgresDePrueba` usa `postgres:17-alpine` y la sección 14 ya lo dice. La línea de Stack de `CLAUDE.md` también dice `postgres:17-alpine`.
   - `vehiculos.flyway_schema_history` ya existe en la base compartida, creada sin migraciones. La `V1__vehiculo.sql` no crea esa tabla. El WARN `No migrations found` del arranque desaparece cuando la V1 se aplique en Supabase (ver etapa 9 en los pendientes de la etapa 4).
 - **Etapa 8 (Docker):**
   - `infra/.env.example` no termina en salto de línea. Corregirlo al completarlo para el compose.
-  - springdoc queda habilitado: el arranque avisa con WARN que conviene deshabilitarlo en producción, pero Insomnia importa `/v3/api-docs`. No hace falta tocarlo en el TP.
+  - springdoc queda habilitado: el arranque avisa con WARN que conviene deshabilitarlo en producción, pero Postman importa `/v3/api-docs`. No hace falta tocarlo en el TP.
 - **Etapa 9 (punta a punta):**
   - `scripts/cargar-env.ps1` nunca se ejecutó en PowerShell: se desarrolló y probó solo `cargar-env.sh`, en Linux. Probarlo en Windows antes de la demo.
   - `curl` a `/swagger-ui.html` responde 302 hacia `/swagger-ui/index.html`. Usar `curl -L` o abrirlo en el navegador.
@@ -608,9 +615,9 @@ Decisiones de la etapa 3 que las etapas siguientes deben respetar:
 
 ### Pendientes que dejó la etapa 4 (persistencia)
 
-Están hechos: `V1__vehiculo.sql`, `VehiculoEntity`, `PrecioHistorialEntity`, sus repositorios Spring Data, el puerto `VehiculoRepositorio`, el adaptador `VehiculoRepositorioJpa`, `DominioConfig` y los tests con Testcontainers (`PostgresDePrueba`, `@PruebaIntegracion`, `RelojDePrueba`, `MigracionesTest`, `VehiculoRepositorioJpaTest`). **El seed no se hizo**; la V1 todavía no corrió contra Supabase. Lo que quedó para las etapas siguientes:
+Están hechos: `V1__vehiculo.sql`, `VehiculoEntity`, `PrecioHistorialEntity`, sus repositorios Spring Data, el puerto `VehiculoRepositorio`, el adaptador `VehiculoRepositorioJpa`, `DominioConfig` y los tests con Testcontainers (`PostgresDePrueba`, `@PruebaIntegracion`, `RelojDePrueba`, `MigracionesTest`, `VehiculoRepositorioJpaTest`). **El seed se hizo después, ver "Pendientes que dejó el seed"**; la V1 ya corrió contra Supabase (ver etapa 9). Lo que quedó para las etapas siguientes:
 
-- **Seed (etapa a definir, sección 9.3):**
+- **[Resuelto en la etapa del seed, sección 9.3] Seed:**
   - Flyway valida que toda migración versionada esté aplicada y en orden. Si el seed fuera `V1000__...` y después se agrega una `V2` de esquema, la base compartida falla al validar (migración resuelta pero no aplicada, con una versión mayor ya aplicada). Recomendación: hacer el seed una **migración repetible e idempotente** (`R__seed_vehiculos.sql`, con `ON CONFLICT (id) DO NOTHING` y ids fijos) en `db/seed`, que corre siempre después de las versionadas.
   - Contenido: datos ficticios variados (marcas, cajas, años, precios, kilometrajes), al menos una unidad con `disponible = false`, fotos en `NULL` y una fila inicial en `precio_historial` por unidad, con el mismo precio que `vehiculo.precio`. Como el SQL no pasa por el `Clock`, `creado_en`, `actualizado_en` y `vigente_desde` van con valores explícitos y coherentes entre sí.
   - Antes de activar el perfil `seed` contra Supabase, avisar al equipo: es la base compartida (regla 4 de `CLAUDE.md`).
@@ -634,6 +641,37 @@ Decisiones de la etapa 4 que las etapas siguientes deben respetar:
 
 ---
 
+### Pendientes que dejó el seed
+
+Está hecho: `db/seed/R__seed_vehiculos.sql`, `application-seed.yml` y `SeedTest` (sección 9.3). `mvn -pl vehiculos-service -am verify` pasa completo (104 tests). **No se cargó en Supabase ni se probó por HTTP**: los tests usan Testcontainers (regla 5 de `CLAUDE.md`) y todavía no hay controllers (`GET /vehiculos` da 404 hasta la etapa 5). Se decidió probar todo junto en la etapa 5. Lo que quedó, agrupado por etapa:
+
+- **Etapa 5 (API de lectura): cargar el seed en Supabase y probarlo con Postman.**
+  - Antes de cargar: avisar al equipo (regla 4 de `CLAUDE.md`), porque es la base compartida. Cargarlo una sola vez: `source scripts/cargar-env.sh && SPRING_PROFILES_ACTIVE=local,seed mvn -pl vehiculos-service spring-boot:run`, y después volver a `local` (Flyway ya registró la repetible).
+  - Verificar en el dashboard o con SQL: 10 filas en `vehiculos.vehiculo` y 10 en `vehiculos.precio_historial`; `disponible` en 8 `true` y 2 `false`; `foto_url` en `NULL` en todas; en `flyway_schema_history`, la `V1` y una fila `seed vehiculos` con `version` vacía y `success = true`. El rol `vehiculos_app` necesita `INSERT` en ambas tablas (lo tiene si pudo aplicar la V1; si falla, revisar permisos antes que el SQL).
+  - Idempotencia real: reiniciar la app con `local,seed` y comprobar que no corre ninguna migración y que los conteos siguen en 10 y 10; reiniciar solo con `local` y comprobar que arranca y los datos quedan.
+  - Casos de Postman: `GET /vehiculos` devuelve 10, ordenados del más nuevo al más viejo (Citroën C3 primero, Corolla último); `?disponible=true` devuelve 8 y `?disponible=false` devuelve 2 (Sandero y Civic); `GET /vehiculos/a0000000-0000-4000-8000-000000000005` (Sandero, `disponible = false`) responde 200; `/precio` devuelve `{precio, disponible}`; `/historial-precios` devuelve 1 fila por unidad con el mismo precio que `vehiculo.precio`; ninguna respuesta trae `creadoEn` ni `actualizadoEn`; `fotoUrl` es `null`; `caja` sale como `AUTOMATICA` o `MANUAL`. Los números (10, 8, 2) dependen del seed: si se cambia, actualizarlos acá.
+  - Si el `GET` de alguna unidad sembrada da 500, mirar primero `VehiculoInvalidoException` (dato fuera de las invariantes); el seed ya tiene un test que lo descarta, pero Supabase podría tener datos viejos.
+- **Etapa 6 (alta y actualización):**
+  - Las unidades creadas por la API usan el `Clock` real, así que quedan antes que las sembradas en el listado (`creado_en DESC`). Esperarlo al probar el orden.
+  - Al hacer un `PUT` de precio sobre una unidad sembrada, el historial pasa a tener 2 filas: la sembrada (`b0000000-...`) y la nueva. Probarlo con una unidad sembrada y comprobar que la fila más reciente coincide con `vehiculo.precio`.
+  - Un `PUT` que solo cambia `disponible` sobre una unidad sembrada no debe agregar fila al historial.
+  - Antes de borrar el seed con SQL, ver la nota "Para limpiar el seed" más abajo: las filas de historial agregadas por la API no tienen el prefijo `b0000000`.
+- **Etapa 7 (fotos):** las unidades sembradas tienen `foto_url = NULL`. Probar `PUT /vehiculos/{id}/foto` sobre una de ellas y comprobar que `fotoUrl` pasa a tener valor. Esto cambia el seed en esa base: al limpiar o recargar, el objeto del bucket `vehiculos-fotos` (`{vehiculoId}.{ext}`) queda huérfano y hay que borrarlo a mano.
+- **Etapa 8 (Docker):** decidir si el compose acepta `SPRING_PROFILES_ACTIVE=docker,seed` (el `application-seed.yml` ya sirve sin cambios) o si el seed queda solo para `local`. Si se permite, el contenedor apunta a la misma base compartida: aplica lo mismo que en la etapa 5 (avisar al equipo).
+- **Etapa 9 (punta a punta):** repetir la lista de la etapa 5 sobre el contenedor, partiendo de la base con el seed ya cargado. Chequear también que el WARN `No migrations found` sigue sin aparecer y que `flyway_schema_history` no tiene filas fallidas.
+- **Resueltos al cerrar el seed:** `CLAUDE.md` ya dice `postgres:17-alpine` en la línea de Stack, y las pruebas manuales se hacen con Postman (`CLAUDE.md` y este documento lo dicen en todos lados; si aparece "Insomnia" en algún lugar nuevo, corregirlo).
+- **Si se edita el seed:** Flyway lo vuelve a ejecutar (cambia el checksum), pero `ON CONFLICT DO NOTHING` no actualiza filas existentes. Para corregir un dato ya cargado: borrar las filas por id (primero `precio_historial`, después `vehiculo`) y volver a correr con `seed`. Nunca editar la `V1` por esto.
+- **Si se agrega una `V2` que cambie las tablas o las columnas de `vehiculo` / `precio_historial`:** revisar que el `R__` siga siendo válido. Una columna nueva `NOT NULL` sin `DEFAULT` lo rompería. Revisarlo antes de mergear la `V2`, y correr `SeedTest`.
+- **Para limpiar el seed:** los ids son fijos (`a0000000-0000-4000-8000-0000000000NN` y `b0000000-...`), así que se puede borrar solo lo sembrado sin tocar datos reales. Primero el historial de las unidades sembradas (incluidas las filas que haya agregado la API, que no tienen el prefijo `b0000000`): `DELETE FROM vehiculos.precio_historial WHERE vehiculo_id::text LIKE 'a0000000-%'`. Después `DELETE FROM vehiculos.vehiculo WHERE id::text LIKE 'a0000000-%'`. Otras filas de historial con prefijo `b0000000` no deberían existir.
+
+Decisiones del seed que las etapas siguientes deben respetar:
+
+- El seed es una migración repetible en `db/seed`, nunca una `V`. Un cambio de esquema sigue siendo una `V2` en `db/migration`.
+- `db/seed` no se carga fuera del perfil `seed`: los tests de repositorio y de migraciones esperan la base vacía.
+- El script no califica el schema: depende de que Flyway fije el `search_path` (`flyway.schemas: vehiculos`). Para ejecutarlo a mano hay que hacer antes `SET search_path TO vehiculos`.
+
+---
+
 ## 14. Tecnologías y dependencias
 
 | Componente | Tecnología |
@@ -644,7 +682,7 @@ Decisiones de la etapa 4 que las etapas siguientes deben respetar:
 | Validación | Bean Validation (`spring-boot-starter-validation`) |
 | Documentación | springdoc-openapi 2.9.1 (`/v3/api-docs`, `/swagger-ui.html`) |
 | Observabilidad | Actuator (solo `health`) y Logback con `[%X{correlationId:-}]` |
-| Pruebas | JUnit 5, Mockito, AssertJ, Testcontainers. Pruebas manuales con Insomnia |
+| Pruebas | JUnit 5, Mockito, AssertJ, Testcontainers. Pruebas manuales con Postman |
 | Build y despliegue | Maven, Docker, Docker Compose |
 
 Dependencias Maven de `vehiculos-service`: `spring-boot-starter-web`, `spring-boot-starter-validation`, `spring-boot-starter-data-jpa`, `spring-boot-starter-actuator`, `flyway-core`, `flyway-database-postgresql`, `postgresql` (runtime), `springdoc-openapi-starter-webmvc-ui` 2.9.1. En test: `spring-boot-starter-test`, `spring-boot-testcontainers`, `testcontainers` (`junit-jupiter` y `postgresql`) y `assertj-core`. No lleva `spring-kafka`, `resilience4j` ni `libphonenumber`.
@@ -670,7 +708,7 @@ Dependencias Maven de `vehiculos-service`: `spring-boot-starter-web`, `spring-bo
 | DV-11 | Las escrituras exigen `X-Api-Key` | Escrituras abiertas | Sin autenticación de usuarios, cualquiera que llegue al gateway podría cambiar un precio |
 | DV-12 | Sin atributo `tipo` de vehículo | Agregarlo porque lo pidió otro servicio | Cada servicio define su propio modelo |
 | DV-13 | Sin módulo `contracts` compartido | Copiarlo del servicio `clientes` | Hoy solo tiene enums de otros servicios y `vehiculos` no consume eventos |
-| DV-14 | Sin OpenSpec. Se trabaja con `CLAUDE.md`, este archivo y pruebas manuales con Insomnia | Desarrollo guiado por especificaciones | Decisión del responsable |
+| DV-14 | Sin OpenSpec. Se trabaja con `CLAUDE.md`, este archivo y pruebas manuales con Postman | Desarrollo guiado por especificaciones | Decisión del responsable |
 
 ### Pendientes que no bloquean
 

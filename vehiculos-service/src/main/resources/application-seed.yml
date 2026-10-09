@@ -1,0 +1,6 @@
+# Perfil que suma el seed de desarrollo (db/seed) a las migraciones de esquema.
+# Se combina con local: SPRING_PROFILES_ACTIVE=local,seed. Solo `seed` dejaría sin datasource.
+# Repite db/migration porque las listas de YAML se reemplazan, no se mezclan.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed
