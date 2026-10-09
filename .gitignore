@@ -1,4 +1,5 @@
 .env
+.env.example
 target/
 .idea/
 .vscode/
@@ -6,3 +7,4 @@ target/
 .agents
 .claude
 CLAUDE.md
+ClientMicroservice-dev/
