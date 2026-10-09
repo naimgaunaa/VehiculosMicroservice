@@ -3,9 +3,14 @@ package com.uade.crm.vehiculos.infrastructure.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,9 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.uade.crm.vehiculos.PruebaIntegracion;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Table;
+
 /**
  * La V1 contra PostgreSQL real. Que el contexto arranque ya prueba que las entidades coinciden con el
- * esquema ({@code ddl-auto: validate}); acá se verifica el esquema y sus restricciones.
+ * esquema ({@code ddl-auto: validate}), pero esa validación solo mira nombres y tipos: no compara precisión,
+ * escala, longitud ni nulabilidad. Acá se verifica el esquema, sus restricciones y esos atributos.
  */
 @PruebaIntegracion
 @Transactional
@@ -45,6 +54,69 @@ class MigracionesTest {
 
         assertThat(tablas).contains("vehiculo", "precio_historial");
         assertThat(indices).contains("ix_vehiculo_disponible", "ix_precio_historial_vehiculo");
+    }
+
+    /** Lo mismo que declara el SQL de la V1 (sección 9.2 del doc), columna por columna y en orden. */
+    @Test
+    void lasColumnasDeVehiculoCoincidenConLaV1() {
+        assertThat(describirColumnas("vehiculo")).containsExactly(
+                "id uuid NOT NULL",
+                "marca character varying(60) NOT NULL",
+                "modelo character varying(80) NOT NULL",
+                "version character varying(80)",
+                "anio integer NOT NULL",
+                "kilometraje integer NOT NULL",
+                "precio numeric(14,2) NOT NULL",
+                "disponible boolean NOT NULL",
+                "caja character varying(15) NOT NULL",
+                "foto_url character varying(500)",
+                "creado_en timestamp with time zone NOT NULL",
+                "actualizado_en timestamp with time zone NOT NULL");
+    }
+
+    @Test
+    void lasColumnasDePrecioHistorialCoincidenConLaV1() {
+        assertThat(describirColumnas("precio_historial")).containsExactly(
+                "id uuid NOT NULL",
+                "vehiculo_id uuid NOT NULL",
+                "precio numeric(14,2) NOT NULL",
+                "vigente_desde timestamp with time zone NOT NULL");
+    }
+
+    /** Longitud, precisión, escala y nulabilidad de cada {@code @Column} contra la base, que validate no mira. */
+    @Test
+    void lasEntidadesDeclaranLoMismoQueLaBase() {
+        for (Class<?> entidad : List.of(VehiculoEntity.class, PrecioHistorialEntity.class)) {
+            String tabla = entidad.getAnnotation(Table.class).name();
+            Map<String, Map<String, Object>> columnas = columnas(tabla).stream()
+                    .collect(Collectors.toMap(c -> (String) c.get("column_name"), c -> c));
+            List<Field> mapeados = Arrays.stream(entidad.getDeclaredFields())
+                    .filter(campo -> campo.isAnnotationPresent(Column.class))
+                    .toList();
+
+            assertThat(mapeados).extracting(campo -> campo.getAnnotation(Column.class).name())
+                    .as("columnas de %s sin mapear o de más", tabla)
+                    .containsExactlyInAnyOrderElementsOf(columnas.keySet());
+
+            for (Field campo : mapeados) {
+                Column declarada = campo.getAnnotation(Column.class);
+                Map<String, Object> real = columnas.get(declarada.name());
+                String donde = entidad.getSimpleName() + "." + campo.getName();
+
+                assertThat(declarada.nullable()).as("nullable de %s", donde)
+                        .isEqualTo("YES".equals(real.get("is_nullable")));
+                if (campo.getType() == String.class) {
+                    assertThat(declarada.length()).as("length de %s", donde)
+                            .isEqualTo(entero(real.get("character_maximum_length")));
+                }
+                if (campo.getType() == BigDecimal.class) {
+                    assertThat(declarada.precision()).as("precision de %s", donde)
+                            .isEqualTo(entero(real.get("numeric_precision")));
+                    assertThat(declarada.scale()).as("scale de %s", donde)
+                            .isEqualTo(entero(real.get("numeric_scale")));
+                }
+            }
+        }
     }
 
     @Test
@@ -91,6 +163,29 @@ class MigracionesTest {
                 "INSERT INTO vehiculos.precio_historial (id, vehiculo_id, precio, vigente_desde) "
                         + "VALUES (?, ?, 0, now())", UUID.randomUUID(), id))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    private List<Map<String, Object>> columnas(String tabla) {
+        return jdbc.queryForList("SELECT column_name, data_type, character_maximum_length, numeric_precision, "
+                + "numeric_scale, is_nullable FROM information_schema.columns "
+                + "WHERE table_schema = 'vehiculos' AND table_name = ? ORDER BY ordinal_position", tabla);
+    }
+
+    /** Cada columna como {@code nombre tipo[(largo|precisión,escala)] [NOT NULL]}. */
+    private List<String> describirColumnas(String tabla) {
+        return columnas(tabla).stream().map(c -> {
+            String tipo = (String) c.get("data_type");
+            if (c.get("character_maximum_length") != null) {
+                tipo += "(" + entero(c.get("character_maximum_length")) + ")";
+            } else if ("numeric".equals(tipo)) {
+                tipo += "(" + entero(c.get("numeric_precision")) + "," + entero(c.get("numeric_scale")) + ")";
+            }
+            return c.get("column_name") + " " + tipo + ("NO".equals(c.get("is_nullable")) ? " NOT NULL" : "");
+        }).toList();
+    }
+
+    private static int entero(Object valor) {
+        return ((Number) valor).intValue();
     }
 
     private UUID insertarVehiculo(String precio, int kilometraje, String caja) {
