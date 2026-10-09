@@ -174,7 +174,7 @@ Ejemplo, vehículo inexistente:
 | `version` | texto (por ejemplo "Exclusive CVT") | No | Versión comercial del modelo. No es la versión de concurrencia: no se usa `@Version` de JPA |
 | `anio` | entero | Sí | |
 | `kilometraje` | entero (km) | Sí | |
-| `precio` | `BigDecimal` | Sí | |
+| `precio` | `BigDecimal` | Sí | `NUMERIC(14, 2)`: hasta 12 dígitos enteros y 2 decimales. El dominio lo normaliza a 2 decimales |
 | `disponible` | booleano | Sí | `true` por defecto en el alta |
 | `caja` | `AUTOMATICA` o `MANUAL` | Sí | Enum `Caja` |
 | `fotoUrl` | texto (URL) | No | URL pública de Storage |
@@ -264,7 +264,7 @@ Respuesta de `GET /vehiculos/{id}/historial-precios`:
 
 ## 6. Reglas de negocio
 
-- **Invariantes** (en `Vehiculo.builder().build()` y al actualizar): precio positivo, kilometraje mayor o igual a 0, marca y modelo no vacíos, `caja` presente, año entre 1950 y el año actual más uno, calculado con el `Clock` inyectado.
+- **Invariantes** (en `Vehiculo.builder().build()` y al actualizar): precio positivo, con 2 decimales como máximo y 12 dígitos enteros como máximo (la columna es `NUMERIC(14, 2)`; el dominio rechaza lo que la base redondearía o desbordaría y normaliza a escala 2, así `10000000` queda `10000000.00`), kilometraje mayor o igual a 0, marca y modelo no vacíos, `caja` presente, año entre 1950 y el año actual más uno, calculado con el `Clock` inyectado.
 - **Doble validación:** los DTOs de request se validan con Bean Validation y devuelven `VALIDACION` con `errores`. El Builder protege al dominio aunque el DTO falle.
 - **Filtrado:** el servidor solo filtra por `disponible`. El front trae la lista completa y filtra en memoria. Sin paginación.
 - **Precio disponible o no:** `GET /vehiculos/{id}/precio` y `GET /vehiculos/{id}` responden `200` aunque `disponible` sea false. `calificacion` puede procesar un lead después de la venta y el front puede mostrar una ficha vieja. `vehiculos` solo informa: la respuesta incluye `disponible` y quien consulta decide qué hacer. Si el id no existe, `404` con `VEHICULO_NO_ENCONTRADO`.
@@ -622,6 +622,8 @@ Están hechos: `V1__vehiculo.sql`, `VehiculoEntity`, `PrecioHistorialEntity`, su
   - Contenido: datos ficticios variados (marcas, cajas, años, precios, kilometrajes), al menos una unidad con `disponible = false`, fotos en `NULL` y una fila inicial en `precio_historial` por unidad, con el mismo precio que `vehiculo.precio`. Como el SQL no pasa por el `Clock`, `creado_en`, `actualizado_en` y `vigente_desde` van con valores explícitos y coherentes entre sí.
   - Antes de activar el perfil `seed` contra Supabase, avisar al equipo: es la base compartida (regla 4 de `CLAUDE.md`).
 - **Etapas 5 y 6 (servicios):**
+  - El dominio normaliza `precio` a 2 decimales, así que `VehiculoResponse` y `PrecioResponse` serializarían `10000000.00`, mientras los ejemplos de la sección 5.3 muestran `10000000`. Decidirlo en la etapa 5: actualizar los ejemplos o quitar los ceros al serializar (sin pasar el monto a texto: en JSON viaja como número).
+  - Comparar precios con `compareTo`, nunca con `equals`: `10500000` y `10500000.00` son distintos para `equals`. Igual el dominio normaliza a escala 2 en el Builder y en `actualizarPrecio`, así que dos precios del dominio comparan bien.
   - La transacción de negocio la abre el servicio (`@Transactional`); el adaptador se une a ella. El alta o el `PUT` que cambia el precio llaman a `guardar` y a `registrarPrecio` dentro de la misma transacción.
   - `registrarPrecio` no comprueba que el precio coincida con `vehiculo.precio`: mantener "la fila más reciente coincide con el precio actual" es responsabilidad del servicio. Tampoco decide si escribir: el servicio compara el precio nuevo con el actual y no registra nada si solo cambia `disponible` o si el precio es igual.
   - `guardar` renueva `actualizado_en` en cada llamada, aunque no haya cambios. El servicio no debe llamarlo si no cambió nada.

@@ -117,6 +117,19 @@ class VehiculoRepositorioJpaTest {
         assertThat(leido.caja()).isEqualTo(Caja.MANUAL);
     }
 
+    /** Lo que devuelve {@code guardar} tiene que ser igual, escala incluida, a lo que se lee después. */
+    @Test
+    void elPrecioConservaLaEscalaEnLaIdaYVuelta() {
+        Vehiculo original = unVehiculo().precio(new BigDecimal("10000000")).build();
+
+        Vehiculo guardado = repositorio.guardar(original);
+        sincronizar();
+        Vehiculo leido = repositorio.buscarPorId(original.id()).orElseThrow();
+
+        assertThat(guardado.precio()).isEqualTo(new BigDecimal("10000000.00"));
+        assertThat(leido.precio()).isEqualTo(guardado.precio());
+    }
+
     @Test
     void buscarPorIdDeUnaUnidadInexistenteDevuelveVacio() {
         assertThat(repositorio.buscarPorId(UUID.randomUUID())).isEmpty();

@@ -14,6 +14,9 @@ import java.util.UUID;
 public final class Vehiculo {
 
     static final int ANIO_MINIMO = 1950;
+    /** Escala y dígitos enteros de {@code precio NUMERIC(14, 2)}. */
+    static final int DECIMALES_PRECIO = 2;
+    static final int ENTEROS_PRECIO = 12;
 
     private final UUID id;
     private final String marca;
@@ -99,11 +102,22 @@ public final class Vehiculo {
         this.fotoUrl = url;
     }
 
+    /**
+     * Valida contra la columna {@code NUMERIC(14, 2)} y normaliza a 2 decimales, para que el precio en memoria
+     * sea el mismo que devuelve la base ({@code 10000000} queda {@code 10000000.00}).
+     */
     private static BigDecimal validarPrecio(BigDecimal precio) {
         if (precio == null || precio.signum() <= 0) {
             throw new VehiculoInvalidoException("El precio debe ser mayor que cero");
         }
-        return precio;
+        if (precio.stripTrailingZeros().scale() > DECIMALES_PRECIO) {
+            throw new VehiculoInvalidoException("El precio admite como máximo " + DECIMALES_PRECIO + " decimales");
+        }
+        if (precio.precision() - precio.scale() > ENTEROS_PRECIO) {
+            throw new VehiculoInvalidoException(
+                    "El precio admite como máximo " + ENTEROS_PRECIO + " dígitos enteros");
+        }
+        return precio.setScale(DECIMALES_PRECIO);
     }
 
     private static void textoObligatorio(String valor, String mensaje) {
