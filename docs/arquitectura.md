@@ -678,6 +678,18 @@ Decisiones del seed que las etapas siguientes deben respetar:
 - `db/seed` no se carga fuera del perfil `seed`: los tests de repositorio y de migraciones esperan la base vacía.
 - El script no califica el schema: depende de que Flyway fije el `search_path` (`flyway.schemas: vehiculos`). Para ejecutarlo a mano hay que hacer antes `SET search_path TO vehiculos`.
 
+### Pendientes que dejó la etapa 5 (lectura)
+
+Está hecho: `ConsultaVehiculoService`, los DTOs `VehiculoResponse`, `PrecioResponse` y `PrecioHistoricoResponse`, `VehiculoController` con los 4 `GET` documentados en `/v3/api-docs`, el mapeo de `VehiculoNoEncontradoException` a `VEHICULO_NO_ENCONTRADO` 404 y los tests (`ConsultaVehiculoServiceTest`, `VehiculoControllerTest`, `VehiculoApiSeedTest`, `ArranqueSinSeedTest`). Se probó contra Supabase con el seed cargado. Lo que quedó, agrupado por etapa:
+
+- **Etapa 6 (alta y actualización):**
+  - **Dato guardado inválido:** antes de mapear `VehiculoInvalidoException` a `VALIDACION` 422, hacer que `VehiculoRepositorioJpa.aDominio` la atrape y la relance como `IllegalStateException("Dato guardado inválido para el vehículo " + id, causa)`, para que un dato corrupto en la base siga dando 500 `ERROR_INTERNO` en los `GET` y el 422 quede solo para datos de entrada. `VehiculoApiSeedTest#datoGuardadoFueraDeLasInvariantesResponde500SinDetalle` (inserta `anio = 1900` y pasa por el adaptador real) tiene que seguir pasando sin cambios; `VehiculoControllerTest#datoGuardadoInvalidoResponde500SinDetalle` hace que el mock lance `VehiculoInvalidoException` y hay que cambiarlo para que lance la excepción nueva.
+  - Hoy una sola fila fuera de las invariantes hace que todo `GET /vehiculos` responda 500, no solo el detalle de esa unidad. Decidir si se acepta o si el listado debe tolerarlo.
+  - **Precio en el dominio:** `CLAUDE.md` dice que `Vehiculo.builder().build()` normaliza el precio a escala 2 y limita la parte entera a 12 dígitos, pero `Vehiculo.validarPrecio` solo exige que sea mayor que 0. Sin eso, un `POST` o `PUT` con `100.125` se guarda redondeado por PostgreSQL (`NUMERIC(14,2)`) sin aviso, y uno con 13 dígitos enteros da 500 por desborde de la columna en vez de 422. Las lecturas no se ven afectadas: la API ya responde siempre con 2 decimales (`Precios.aEscala2` en `api.dto`, que no redondea).
+  - El `detail` del 400 `SOLICITUD_INVALIDA` por un id de ruta que no es UUID (o un `disponible` que no es booleano) sale en inglés, generado por Spring: `Failed to convert 'id' with value: 'no-es-un-uuid'`. Si se quiere en español, traducirlo en `ApiExceptionHandler` (`handleTypeMismatch`).
+- **Documento:** los ejemplos de la sección 5.3 muestran el precio como `10000000`; la API responde con 2 decimales (`10000000.00`, decisión de la etapa 5). Para un parser JSON es el mismo número, pero conviene alinear los ejemplos.
+- **Si se edita el seed:** `VehiculoApiSeedTest` depende de sus números (10 unidades, 8 disponibles, 2 no disponibles: Sandero y Civic; Citroën C3 primero y Corolla último). Actualizarlo junto con `R__seed_vehiculos.sql`.
+
 ---
 
 ## 14. Tecnologías y dependencias
