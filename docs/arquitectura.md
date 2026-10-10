@@ -683,6 +683,26 @@ Decisiones del seed que las etapas siguientes deben respetar:
 
 ---
 
+### Pendientes que dejó la etapa 5.1 (suite contra Supabase)
+
+Está hecho: el perfil Maven `supabase`, `application-supabase.yml` y `application-test.yml` (pool de Hikari en 2) en `src/test/resources`, la guarda `GuardaSchemaDePrueba` (registrada en `META-INF/spring.factories` de test) con `GuardaSchemaDePruebaTest`, la estrategia de limpieza en `PostgresDePrueba` y la anotación `@PruebaIntegracionSeed`. `verify` pasa en Testcontainers (175 tests, ~19 s) y con `-Psupabase` contra `vehiculos_test` (175 tests, ~3 min 40 s). Lo que quedó:
+
+- **Actualizar §9.3 y §12:** §9.3 dice que `SeedTest` tiene contexto propio; ahora `SeedTest`, `ArranqueSinSeedTest` y `VehiculoApiSeedTest` comparten uno con `@PruebaIntegracionSeed` (`@PruebaIntegracion` + perfiles `test,seed` + `@Tag("seed")`). §12 describe `PostgresDePrueba` solo con Testcontainers; ahora con el perfil `supabase` no levanta contenedor y hace `clean` + `migrate` sobre `vehiculos_test` al arrancar cada contexto, y `-Psupabase` corre dos JVM en serie (sin y con la etiqueta `seed`). Falta mencionar la guarda: se niega a arrancar si el schema no es exactamente `vehiculos_test` o si faltan las `VEHICULOS_DB_*`.
+- **Etapa 4, nota de pruebas:** dice que las consultas nativas califican `vehiculos.vehiculo`. Ahora toman el schema de `spring.jpa.properties.hibernate.default_schema` (`@Value`), para correr igual en `vehiculos` y en `vehiculos_test`.
+- **Corridas concurrentes:** cada contexto limpia `vehiculos_test` al arrancar, así que dos integrantes que corran `-Psupabase` a la vez se borran el schema mutuamente. Mientras no haya un lock (ver `docs/mejoras.md`), la suite contra Supabase la corre solo el responsable de `vehiculos`.
+- **Etapa 6 (escrituras):** los tests nuevos van con `@PruebaIntegracion` (o `@PruebaIntegracionSeed`) y `@Transactional`, para que se revierta. Una escritura que se confirme queda en la base durante el resto de la corrida y rompe los tests que esperan la base vacía; en Supabase, además, el contexto es uno solo por JVM. Un test con seed que no use `@PruebaIntegracionSeed` correría en la JVM sin seed y la ensuciaría.
+- **Contextos:** la suite tiene 5 contextos (2 con base y 3 `@WebMvcTest`). Antes de agregar una configuración propia a un test de integración (un `@Import`, un `@MockitoBean`, otro perfil), considerar que crea un contexto nuevo: en Supabase limpia el schema otra vez y suma 2 conexiones al session pooler.
+- **No probado:** el mensaje de "proyecto pausado" de la estrategia de limpieza. Probarlo la próxima vez que el proyecto esté pausado, antes de reactivarlo.
+
+Decisiones de la etapa 5.1 que las etapas siguientes deben respetar:
+
+- El modo se elige solo con `-Psupabase`. Que las `VEHICULOS_DB_*` estén cargadas no cambia nada: `verify` sigue en Testcontainers.
+- La guarda vive en un `EnvironmentPostProcessor` de test, no en una anotación: corre en todo contexto que arranque desde el classpath de test. Se activa con el perfil `supabase` o con cualquier `spring.datasource.url` configurada.
+- `clean-disabled: false` solo está en `application-supabase.yml` de test. En `main` sigue deshabilitado.
+- `flyway.create-schemas: false` en Supabase: el schema `vehiculos_test` se crea a mano una vez y `clean` vacía su contenido sin borrarlo.
+
+---
+
 ## 14. Tecnologías y dependencias
 
 | Componente | Tecnología |

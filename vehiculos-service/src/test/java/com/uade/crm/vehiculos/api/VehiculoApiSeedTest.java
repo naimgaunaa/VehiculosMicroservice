@@ -13,27 +13,22 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.uade.crm.vehiculos.PropiedadesDePrueba;
-import com.uade.crm.vehiculos.PruebaIntegracion;
+import com.uade.crm.vehiculos.PruebaIntegracionSeed;
 
-/**
- * La API de lectura de punta a punta sobre el seed, contra PostgreSQL de Testcontainers. Tiene contexto propio
- * (perfil {@code seed} y MockMvc). {@code @ActiveProfiles} directo reemplaza al de {@link PropiedadesDePrueba},
- * por eso se repite {@code test}. Los números (10, 8, 2) dependen de {@code R__seed_vehiculos.sql}.
- */
-@PruebaIntegracion
-@ActiveProfiles({"test", "seed"})
-@AutoConfigureMockMvc
+/** La API de lectura de punta a punta sobre el seed. Los números (10, 8, 2) dependen de {@code R__seed_vehiculos.sql}. */
+@PruebaIntegracionSeed
 @Transactional
 class VehiculoApiSeedTest {
 
     private static final String SANDERO = "a0000000-0000-4000-8000-000000000005";
+
+    @Value("${spring.jpa.properties.hibernate.default_schema}")
+    private String schema;
 
     @Autowired
     private MockMvc mvc;
@@ -136,11 +131,9 @@ class VehiculoApiSeedTest {
     @Test
     void datoGuardadoFueraDeLasInvariantesResponde500SinDetalle() throws Exception {
         String id = "c0000000-0000-4000-8000-000000000001";
-        jdbc.update("""
-                INSERT INTO vehiculos.vehiculo (id, marca, modelo, anio, kilometraje, precio, disponible, caja,
-                                                creado_en, actualizado_en)
-                VALUES (?::uuid, 'Ford', 'Falcon', 1900, 0, 1000.00, TRUE, 'MANUAL', now(), now())
-                """, id);
+        jdbc.update("INSERT INTO " + schema + ".vehiculo (id, marca, modelo, anio, kilometraje, precio, disponible, "
+                + "caja, creado_en, actualizado_en) "
+                + "VALUES (?::uuid, 'Ford', 'Falcon', 1900, 0, 1000.00, TRUE, 'MANUAL', now(), now())", id);
 
         String cuerpo = mvc.perform(get("/vehiculos/{id}", id))
                 .andExpect(status().isInternalServerError())

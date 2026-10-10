@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,13 +33,16 @@ import jakarta.persistence.Table;
 @Transactional
 class MigracionesTest {
 
+    @Value("${spring.jpa.properties.hibernate.default_schema}")
+    private String schema;
+
     @Autowired
     private JdbcTemplate jdbc;
 
     @Test
     void flywayAplicoSoloLaV1EnElSchemaVehiculos() {
         List<String> aplicadas = jdbc.queryForList(
-                "SELECT version FROM vehiculos.flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank",
+                "SELECT version FROM " + schema + ".flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank",
                 String.class);
 
         assertThat(aplicadas).containsExactly("1");
@@ -47,10 +51,9 @@ class MigracionesTest {
     @Test
     void creaLasTablasYLosIndicesEnElSchemaVehiculos() {
         List<String> tablas = jdbc.queryForList(
-                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'vehiculos'",
-                String.class);
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = ?", String.class, schema);
         List<String> indices = jdbc.queryForList(
-                "SELECT indexname FROM pg_indexes WHERE schemaname = 'vehiculos'", String.class);
+                "SELECT indexname FROM pg_indexes WHERE schemaname = ?", String.class, schema);
 
         assertThat(tablas).contains("vehiculo", "precio_historial");
         assertThat(indices).contains("ix_vehiculo_disponible", "ix_precio_historial_vehiculo");
@@ -124,7 +127,7 @@ class MigracionesTest {
         UUID id = insertarVehiculo("100000.00", 0, "AUTOMATICA");
 
         Boolean disponible = jdbc.queryForObject(
-                "SELECT disponible FROM vehiculos.vehiculo WHERE id = ?", Boolean.class, id);
+                "SELECT disponible FROM " + schema + ".vehiculo WHERE id = ?", Boolean.class, id);
 
         assertThat(disponible).isTrue();
     }
@@ -150,7 +153,7 @@ class MigracionesTest {
     @Test
     void elHistorialExigeUnVehiculoExistente() {
         assertThatThrownBy(() -> jdbc.update(
-                "INSERT INTO vehiculos.precio_historial (id, vehiculo_id, precio, vigente_desde) "
+                "INSERT INTO " + schema + ".precio_historial (id, vehiculo_id, precio, vigente_desde) "
                         + "VALUES (?, ?, 100000.00, now())", UUID.randomUUID(), UUID.randomUUID()))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -160,7 +163,7 @@ class MigracionesTest {
         UUID id = insertarVehiculo("100000.00", 0, "MANUAL");
 
         assertThatThrownBy(() -> jdbc.update(
-                "INSERT INTO vehiculos.precio_historial (id, vehiculo_id, precio, vigente_desde) "
+                "INSERT INTO " + schema + ".precio_historial (id, vehiculo_id, precio, vigente_desde) "
                         + "VALUES (?, ?, 0, now())", UUID.randomUUID(), id))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -168,7 +171,7 @@ class MigracionesTest {
     private List<Map<String, Object>> columnas(String tabla) {
         return jdbc.queryForList("SELECT column_name, data_type, character_maximum_length, numeric_precision, "
                 + "numeric_scale, is_nullable FROM information_schema.columns "
-                + "WHERE table_schema = 'vehiculos' AND table_name = ? ORDER BY ordinal_position", tabla);
+                + "WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position", schema, tabla);
     }
 
     /** Cada columna como {@code nombre tipo[(largo|precisión,escala)] [NOT NULL]}. */
@@ -191,7 +194,7 @@ class MigracionesTest {
     private UUID insertarVehiculo(String precio, int kilometraje, String caja) {
         UUID id = UUID.randomUUID();
         Timestamp ahora = new Timestamp(System.currentTimeMillis());
-        jdbc.update("INSERT INTO vehiculos.vehiculo "
+        jdbc.update("INSERT INTO " + schema + ".vehiculo "
                         + "(id, marca, modelo, anio, kilometraje, precio, caja, creado_en, actualizado_en) "
                         + "VALUES (?, 'Marca', 'Modelo', 2020, ?, ?::numeric, ?, ?, ?)",
                 id, kilometraje, precio, caja, ahora, ahora);

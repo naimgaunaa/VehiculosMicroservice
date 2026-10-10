@@ -12,10 +12,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.transaction.IllegalTransactionStateException;
@@ -39,19 +35,8 @@ import jakarta.persistence.EntityManager;
  * ({@link #sincronizar()}) para que el mapeo se compruebe contra la base y no contra el caché.
  */
 @PruebaIntegracion
-@Import(VehiculoRepositorioJpaTest.RelojConfig.class)
 @Transactional
 class VehiculoRepositorioJpaTest {
-
-    @TestConfiguration(proxyBeanMethods = false)
-    static class RelojConfig {
-
-        @Bean
-        @Primary
-        RelojDePrueba relojDePrueba() {
-            return new RelojDePrueba();
-        }
-    }
 
     @Autowired
     private VehiculoRepositorio repositorio;

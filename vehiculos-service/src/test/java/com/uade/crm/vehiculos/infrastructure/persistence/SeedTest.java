@@ -9,32 +9,24 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.uade.crm.vehiculos.PostgresDePrueba;
-import com.uade.crm.vehiculos.PropiedadesDePrueba;
+import com.uade.crm.vehiculos.PruebaIntegracionSeed;
 import com.uade.crm.vehiculos.domain.model.Caja;
 import com.uade.crm.vehiculos.domain.model.PrecioHistorico;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
 import com.uade.crm.vehiculos.domain.port.VehiculoRepositorio;
 
-/**
- * El seed de desarrollo con el perfil {@code seed}. Tiene contexto propio (otro perfil activo), así que no
- * contamina a los tests que esperan la base vacía. {@code @ActiveProfiles} directo reemplaza al de
- * {@link PropiedadesDePrueba}, por eso se repite {@code test}.
- */
-@SpringBootTest
-@Import(PostgresDePrueba.class)
-@PropiedadesDePrueba
-@ActiveProfiles({"test", "seed"})
+@PruebaIntegracionSeed
 @Transactional
 class SeedTest {
+
+    @Value("${spring.jpa.properties.hibernate.default_schema}")
+    private String schema;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -45,7 +37,7 @@ class SeedTest {
     @Test
     void flywayAplicoLaV1YElSeedRepetible() {
         List<Map<String, Object>> aplicadas = jdbc.queryForList(
-                "SELECT version, script FROM vehiculos.flyway_schema_history WHERE success AND type = 'SQL' ORDER BY installed_rank");
+                "SELECT version, script FROM " + schema + ".flyway_schema_history WHERE success AND type = 'SQL' ORDER BY installed_rank");
 
         assertThat(aplicadas).extracting(fila -> fila.get("version")).containsExactly("1", null);
         assertThat(aplicadas.get(1).get("script")).isEqualTo("R__seed_vehiculos.sql");
@@ -96,19 +88,19 @@ class SeedTest {
     void elScriptEsIdempotente() throws Exception {
         long vehiculosAntes = contar("vehiculo");
         long historialAntes = contar("precio_historial");
-        BigDecimal sumaAntes = jdbc.queryForObject("SELECT SUM(precio) FROM vehiculos.vehiculo", BigDecimal.class);
+        BigDecimal sumaAntes = jdbc.queryForObject("SELECT SUM(precio) FROM " + schema + ".vehiculo", BigDecimal.class);
 
         // Flyway no vuelve a correr una repetible sin cambios, así que se ejecuta el script a mano.
         // Flyway fija el search_path en su conexión; acá hay que hacerlo porque el SQL no califica el schema.
         jdbc.execute((java.sql.Connection conexion) -> {
-            conexion.createStatement().execute("SET LOCAL search_path TO vehiculos");
+            conexion.createStatement().execute("SET LOCAL search_path TO " + schema);
             ScriptUtils.executeSqlScript(conexion, new ClassPathResource("db/seed/R__seed_vehiculos.sql"));
             return null;
         });
 
         assertThat(contar("vehiculo")).isEqualTo(vehiculosAntes);
         assertThat(contar("precio_historial")).isEqualTo(historialAntes);
-        assertThat(jdbc.queryForObject("SELECT SUM(precio) FROM vehiculos.vehiculo", BigDecimal.class))
+        assertThat(jdbc.queryForObject("SELECT SUM(precio) FROM " + schema + ".vehiculo", BigDecimal.class))
                 .isEqualByComparingTo(sumaAntes);
     }
 
@@ -120,6 +112,6 @@ class SeedTest {
     }
 
     private long contar(String tabla) {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM vehiculos." + tabla, Long.class);
+        return jdbc.queryForObject("SELECT COUNT(*) FROM " + schema + "." + tabla, Long.class);
     }
 }

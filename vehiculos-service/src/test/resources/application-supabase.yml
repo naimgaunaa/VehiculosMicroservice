@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: ${VEHICULOS_DB_URL}
+    username: ${VEHICULOS_DB_USUARIO}
+    password: ${VEHICULOS_DB_CLAVE}
+    hikari:
+      connection-timeout: 15000
+  jpa:
+    properties:
+      hibernate:
+        default_schema: vehiculos_test
+  flyway:
+    schemas: vehiculos_test
+    # El schema se crea a mano una sola vez; si Flyway lo creara, clean lo borraría entero.
+    create-schemas: false
+    clean-disabled: false
