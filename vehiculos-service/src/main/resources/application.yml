@@ -9,6 +9,13 @@ spring:
   web:
     locale: es
     locale-resolver: fixed
+  servlet:
+    multipart:
+      # Spring corta en 1 MB por defecto: con 3 MB el límite de 2 MB lo aplica el servicio (422 FOTO_INVALIDA).
+      # Diferido: el archivo se lee al resolver el argumento, después del interceptor de X-Api-Key (401 primero).
+      max-file-size: 3MB
+      max-request-size: 3MB
+      resolve-lazily: true
   jackson:
     deserialization:
       fail-on-unknown-properties: true

@@ -562,7 +562,7 @@ El esqueleto arrancó contra Supabase real el 2026-10-08: el session pooler acep
 
 - **Etapa 4 (persistencia):**
   - **[Resuelto en la etapa 4]** Supabase corre PostgreSQL 17 (el log de arranque dice 17.11). `PostgresDePrueba` usa `postgres:17-alpine` y la sección 14 ya lo dice. La línea de Stack de `CLAUDE.md` también dice `postgres:17-alpine`.
-  - `vehiculos.flyway_schema_history` ya existe en la base compartida, creada sin migraciones. La `V1__vehiculo.sql` no crea esa tabla. El WARN `No migrations found` del arranque desaparece cuando la V1 se aplique en Supabase (ver etapa 9 en los pendientes de la etapa 4).
+  - **[Resuelto: verificado en la etapa 7]** Al arrancar contra Supabase el 2026-10-10, Flyway validó 2 migraciones (la V1 y el seed) y no apareció el WARN `No migrations found`. `vehiculos.flyway_schema_history` ya existe en la base compartida, creada sin migraciones. La `V1__vehiculo.sql` no crea esa tabla. El WARN `No migrations found` del arranque desaparece cuando la V1 se aplique en Supabase (ver etapa 9 en los pendientes de la etapa 4).
 - **Etapa 8 (Docker):**
   - `infra/.env.example` no termina en salto de línea. Corregirlo al completarlo para el compose.
   - springdoc queda habilitado: el arranque avisa con WARN que conviene deshabilitarlo en producción, pero Postman importa `/v3/api-docs`. No hace falta tocarlo en el TP.
@@ -583,17 +583,17 @@ Especificaciones de la etapa 1 que las etapas siguientes deben respetar:
 
 - **Etapa 4 (persistencia):**
   - **[Resuelto en la etapa 4]** `ConfiguracionTransversalTest` ya no excluye DataSource, JPA ni Flyway: usa `@PruebaIntegracion` (PostgreSQL de Testcontainers) y comprueba que el health incluye la base. No se puede volver a excluirlos: `VehiculoRepositorioJpa` necesita el repositorio Spring Data.
-  - Los tests de integración reutilizan `@PropiedadesDePrueba` (a través de `@PruebaIntegracion`) para no depender de las `VEHICULOS_*` del shell.
+  - **[Resuelto en la etapa 4]** Los tests de integración reutilizan `@PropiedadesDePrueba` (a través de `@PruebaIntegracion`) para no depender de las `VEHICULOS_*` del shell.
   - Con DataSource activo, `/actuator/health` incluye la base: si el proyecto de Supabase está pausado, da `DOWN`, y con él el healthcheck del compose. La respuesta HTTP solo muestra `status` (no se expone el detalle de los componentes).
-- **Etapa 5 (lectura):** un id de ruta que no es UUID responde hoy 400 `SOLICITUD_INVALIDA` (`MethodArgumentTypeMismatchException`, cubierto por un test). Si se prefiere 422 `VALIDACION`, decidirlo acá.
+- **[Resuelto en la etapa 5: queda 400, así lo documentan los `@ApiResponse` del controller]** **Etapa 5 (lectura):** un id de ruta que no es UUID responde hoy 400 `SOLICITUD_INVALIDA` (`MethodArgumentTypeMismatchException`, cubierto por un test). Si se prefiere 422 `VALIDACION`, decidirlo acá.
 - **Etapa 6 (escrituras):**
-  - `ClaveServicioInvalidaException` se mapea a `CLAVE_SERVICIO_INVALIDA` 401 con `responder(...)`.
-  - El interceptor compara `VehiculosProperties.claveEscritura()` en tiempo constante (`MessageDigest.isEqual`).
-  - Anotar las operaciones de escritura con `@SecurityRequirement(name = OpenApiConfig.ESQUEMA_CLAVE_SERVICIO)`. El esquema existe en `OpenApiConfig` pero ninguna operación lo usa, así que Swagger todavía no manda `X-Api-Key`.
+  - **[Resuelto en la etapa 6]** `ClaveServicioInvalidaException` se mapea a `CLAVE_SERVICIO_INVALIDA` 401 con `responder(...)`.
+  - **[Resuelto en la etapa 6]** El interceptor compara `VehiculosProperties.claveEscritura()` en tiempo constante (`MessageDigest.isEqual`).
+  - **[Resuelto en las etapas 6 y 7]** Anotar las operaciones de escritura con `@SecurityRequirement(name = OpenApiConfig.ESQUEMA_CLAVE_SERVICIO)`. El esquema existe en `OpenApiConfig` pero ninguna operación lo usa, así que Swagger todavía no manda `X-Api-Key`.
 - **Etapa 7 (fotos):**
-  - Spring limita las subidas a 1 MB por defecto. Para que el límite de 2 MB lo aplique el servicio (422 `FOTO_INVALIDA`), subir `spring.servlet.multipart.max-file-size` y `max-request-size`, y mapear `MaxUploadSizeExceededException` a `FOTO_INVALIDA`. Si no, una foto de 1,5 MB falla antes de llegar al servicio.
-  - Elegir el `FotoStorage` con `VehiculosProperties.modoFotos()` (enum). No usar `@ConditionalOnProperty(havingValue = "supabase")`: distingue mayúsculas y `VEHICULOS_FOTOS_MODO=SUPABASE` dejaría el contexto sin bean.
-  - Falta el test de la sección 12 que verifica que ni la clave de Supabase ni la de escritura aparecen en los logs (hoy solo se prueba `toString`). Al loguear errores de `RestClient`, no volcar headers (`apikey`).
+  - **[Resuelto en la etapa 7]** Spring limita las subidas a 1 MB por defecto. Para que el límite de 2 MB lo aplique el servicio (422 `FOTO_INVALIDA`), subir `spring.servlet.multipart.max-file-size` y `max-request-size`, y mapear `MaxUploadSizeExceededException` a `FOTO_INVALIDA`. Si no, una foto de 1,5 MB falla antes de llegar al servicio.
+  - **[Resuelto en la etapa 7]** Elegir el `FotoStorage` con `VehiculosProperties.modoFotos()` (enum). No usar `@ConditionalOnProperty(havingValue = "supabase")`: distingue mayúsculas y `VEHICULOS_FOTOS_MODO=SUPABASE` dejaría el contexto sin bean.
+  - **[Resuelto en la etapa 7: `SecretosEnLogsTest`]** Falta el test de la sección 12 que verifica que ni la clave de Supabase ni la de escritura aparecen en los logs (hoy solo se prueba `toString`). Al loguear errores de `RestClient`, no volcar headers (`apikey`).
 - **Etapa 8 (Docker):**
   - En el compose, `VEHICULOS_SUPABASE_URL` y `VEHICULOS_SUPABASE_CLAVE_SECRETA` van con `${VAR:-}` y no con `${VAR:?}`: son opcionales en modo `deshabilitado`.
   - El perfil `docker` de la sección 10 no existe (solo hay `application-local.yml`): crear `application-docker.yml` o confirmar que las variables del compose alcanzan.
@@ -608,15 +608,15 @@ El dominio ya está (`Vehiculo`, `Caja`, `PrecioHistorico` y las excepciones). E
   - **[Resuelto en la etapa 4]** `creadoEn` y `actualizadoEn` no están en `Vehiculo`: los fija el adaptador `VehiculoRepositorioJpa` con el `Clock` (alta: ambos; cada `guardar` posterior: conserva `creado_en` y renueva `actualizado_en`).
   - **[Resuelto en la etapa 4]** `aDominio` reconstruye con `Vehiculo.builder(clock)`, informando `id`; el adaptador recibe el `Clock` por constructor. Sigue siendo cierto que un dato guardado con año fuera de rango hace fallar la lectura con `VehiculoInvalidoException`.
   - **[Resuelto en la etapa 4]** Puerto `VehiculoRepositorio` con su `package-info.java` en `domain.port` y `DominioConfig` con el bean `Clock` (`Clock.systemUTC()`).
-- **Etapa 5 (lectura):** mapear `VehiculoNoEncontradoException` a `VEHICULO_NO_ENCONTRADO` 404 en `ApiExceptionHandler`, con el patrón `responder(CodigoError, detalle, request)`. Hasta entonces daría 500.
+- **[Resuelto en la etapa 5]** **Etapa 5 (lectura):** mapear `VehiculoNoEncontradoException` a `VEHICULO_NO_ENCONTRADO` 404 en `ApiExceptionHandler`, con el patrón `responder(CodigoError, detalle, request)`. Hasta entonces daría 500.
 - **Etapa 6 (alta y actualización):**
-  - Mapear `VehiculoInvalidoException` a `VALIDACION` 422. Es la segunda barrera: el DTO valida primero.
-  - Usar `Vehiculo.actualizarPrecio` y `cambiarDisponibilidad` en `ActualizacionVehiculoService`. No reimplementar la regla de precio en el servicio.
-  - Comparar el precio nuevo con el actual para decidir si se escribe en el historial.
+  - **[Resuelto en la etapa 6, con otro enfoque: no se mapea de forma global; cada servicio la convierte en `DatosInvalidosException` solo para la entrada del cliente]** Mapear `VehiculoInvalidoException` a `VALIDACION` 422. Es la segunda barrera: el DTO valida primero.
+  - **[Resuelto en la etapa 6]** Usar `Vehiculo.actualizarPrecio` y `cambiarDisponibilidad` en `ActualizacionVehiculoService`. No reimplementar la regla de precio en el servicio.
+  - **[Resuelto en la etapa 6]** Comparar el precio nuevo con el actual para decidir si se escribe en el historial.
 - **Etapa 7 (fotos):**
-  - Mapear `FotoInvalidaException` a `FOTO_INVALIDA` 422 y `AlmacenamientoNoDisponibleException` a `ALMACENAMIENTO_NO_DISPONIBLE` 503.
-  - Crear `ArchivoFoto` y el puerto `FotoStorage`.
-  - Usar `Vehiculo.asignarFoto`.
+  - **[Resuelto en la etapa 7]** Mapear `FotoInvalidaException` a `FOTO_INVALIDA` 422 y `AlmacenamientoNoDisponibleException` a `ALMACENAMIENTO_NO_DISPONIBLE` 503.
+  - **[Resuelto en la etapa 7]** Crear `ArchivoFoto` y el puerto `FotoStorage`.
+  - **[Resuelto en la etapa 7]** Usar `Vehiculo.asignarFoto`.
 
 Decisiones de la etapa 3 que las etapas siguientes deben respetar:
 
@@ -633,12 +633,12 @@ Están hechos: `V1__vehiculo.sql`, `VehiculoEntity`, `PrecioHistorialEntity`, su
   - Contenido: datos ficticios variados (marcas, cajas, años, precios, kilometrajes), al menos una unidad con `disponible = false`, fotos en `NULL` y una fila inicial en `precio_historial` por unidad, con el mismo precio que `vehiculo.precio`. Como el SQL no pasa por el `Clock`, `creado_en`, `actualizado_en` y `vigente_desde` van con valores explícitos y coherentes entre sí.
   - Antes de activar el perfil `seed` contra Supabase, avisar al equipo: es la base compartida (regla 4 de `CLAUDE.md`).
 - **Etapas 5 y 6 (servicios):**
-  - La transacción de negocio la abre el servicio (`@Transactional`); el adaptador se une a ella. El alta o el `PUT` que cambia el precio llaman a `guardar` y a `registrarPrecio` dentro de la misma transacción.
-  - `registrarPrecio` no comprueba que el precio coincida con `vehiculo.precio`: mantener "la fila más reciente coincide con el precio actual" es responsabilidad del servicio. Tampoco decide si escribir: el servicio compara el precio nuevo con el actual y no registra nada si solo cambia `disponible` o si el precio es igual.
-  - `guardar` renueva `actualizado_en` en cada llamada, aunque no haya cambios. El servicio no debe llamarlo si no cambió nada.
-  - `registrarPrecio` con un `vehiculoId` inexistente lanza `DataIntegrityViolationException` (clave foránea), no `VehiculoNoEncontradoException`: el servicio debe buscar la unidad antes (y ya lo hace para el 404).
+  - **[Resuelto en la etapa 6]** La transacción de negocio la abre el servicio (`@Transactional`); el adaptador se une a ella. El alta o el `PUT` que cambia el precio llaman a `guardar` y a `registrarPrecio` dentro de la misma transacción.
+  - **[Resuelto en la etapa 6]** `registrarPrecio` no comprueba que el precio coincida con `vehiculo.precio`: mantener "la fila más reciente coincide con el precio actual" es responsabilidad del servicio. Tampoco decide si escribir: el servicio compara el precio nuevo con el actual y no registra nada si solo cambia `disponible` o si el precio es igual.
+  - **[Resuelto en la etapa 6]** `guardar` renueva `actualizado_en` en cada llamada, aunque no haya cambios. El servicio no debe llamarlo si no cambió nada.
+  - **[Resuelto en la etapa 6]** `registrarPrecio` con un `vehiculoId` inexistente lanza `DataIntegrityViolationException` (clave foránea), no `VehiculoNoEncontradoException`: el servicio debe buscar la unidad antes (y ya lo hace para el 404).
   - `buscar(Boolean)` devuelve las unidades de la más nueva a la más vieja (`creado_en DESC`, desempate por `id`); el doc de la API no define otro orden. `historialDePrecios` va del más nuevo al más viejo.
-  - Un `GET` de una unidad con datos cargados a mano fuera de las invariantes (por ejemplo `anio` fuera de rango) lanza `VehiculoInvalidoException` al leer. Mientras esa excepción no esté mapeada da 500, y cuando la etapa 6 la mapee a `VALIDACION` 422, un `GET` respondería 422 por un dato guardado. Decidir si conviene distinguir "dato de entrada inválido" de "dato guardado inválido".
+  - **[Resuelto en la etapa 6: un dato guardado inválido da 500 y solo la entrada del cliente da 422]** Un `GET` de una unidad con datos cargados a mano fuera de las invariantes (por ejemplo `anio` fuera de rango) lanza `VehiculoInvalidoException` al leer. Mientras esa excepción no esté mapeada da 500, y cuando la etapa 6 la mapee a `VALIDACION` 422, un `GET` respondería 422 por un dato guardado. Decidir si conviene distinguir "dato de entrada inválido" de "dato guardado inválido".
 - **Etapa 9 (punta a punta):**
   - **[Verificado el 2026-10-09]** La V1 se aplicó contra Supabase al arrancar con `spring-boot:run` (perfil `local`): tablas e índices creados en el schema `vehiculos` y `/actuator/health` en `UP`. Queda como lista de chequeo para repetirlo en la prueba de punta a punta (sobre el contenedor): que el rol `vehiculos_app` tenga permiso para crear tablas e índices en el schema `vehiculos`, que existan `vehiculo` y `precio_historial` en el dashboard, que `/actuator/health` dé `UP` y que desaparezca el WARN `No migrations found`.
   - Esa migración ya no se edita una vez mergeada: cualquier cambio de esquema es una `V2` (regla 4 de `CLAUDE.md`).
@@ -664,7 +664,7 @@ Está hecho: `db/seed/R__seed_vehiculos.sql`, `application-seed.yml` y `SeedTest
   - Si el `GET` de alguna unidad sembrada da 500, mirar primero `VehiculoInvalidoException` (dato fuera de las invariantes); el seed ya tiene un test que lo descarta, pero Supabase podría tener datos viejos.
 - **Etapa 6 (alta y actualización):**
   - Las unidades creadas por la API usan el `Clock` real, así que quedan antes que las sembradas en el listado (`creado_en DESC`). Esperarlo al probar el orden.
-  - Al hacer un `PUT` de precio sobre una unidad sembrada, el historial pasa a tener 2 filas: la sembrada (`b0000000-...`) y la nueva. Probarlo con una unidad sembrada y comprobar que la fila más reciente coincide con `vehiculo.precio`.
+  - **[Resuelto en la etapa 6: probado con el Corolla sembrado]** Al hacer un `PUT` de precio sobre una unidad sembrada, el historial pasa a tener 2 filas: la sembrada (`b0000000-...`) y la nueva. Probarlo con una unidad sembrada y comprobar que la fila más reciente coincide con `vehiculo.precio`.
   - Un `PUT` que solo cambia `disponible` sobre una unidad sembrada no debe agregar fila al historial.
   - Antes de borrar el seed con SQL, ver la nota "Para limpiar el seed" más abajo: las filas de historial agregadas por la API no tienen el prefijo `b0000000`.
 - **Etapa 7 (fotos):** las unidades sembradas tienen `foto_url = NULL`. Probar `PUT /vehiculos/{id}/foto` sobre una de ellas y comprobar que `fotoUrl` pasa a tener valor. Esto cambia el seed en esa base: al limpiar o recargar, el objeto del bucket `vehiculos-fotos` (`{vehiculoId}.{ext}`) queda huérfano y hay que borrarlo a mano.
@@ -690,8 +690,8 @@ Está hecho: el perfil Maven `supabase`, `application-supabase.yml` y `applicati
 - **Actualizar §9.3 y §12:** §9.3 dice que `SeedTest` tiene contexto propio; ahora `SeedTest`, `ArranqueSinSeedTest` y `VehiculoApiSeedTest` comparten uno con `@PruebaIntegracionSeed` (`@PruebaIntegracion` + perfiles `test,seed` + `@Tag("seed")`). §12 describe `PostgresDePrueba` solo con Testcontainers; ahora con el perfil `supabase` no levanta contenedor y hace `clean` + `migrate` sobre `vehiculos_test` al arrancar cada contexto, y `-Psupabase` corre dos JVM en serie (sin y con la etiqueta `seed`). Falta mencionar la guarda: se niega a arrancar si el schema no es exactamente `vehiculos_test` o si faltan las `VEHICULOS_DB_*`.
 - **Etapa 4, nota de pruebas:** dice que las consultas nativas califican `vehiculos.vehiculo`. Ahora toman el schema de `spring.jpa.properties.hibernate.default_schema` (`@Value`), para correr igual en `vehiculos` y en `vehiculos_test`.
 - **Corridas concurrentes:** cada contexto limpia `vehiculos_test` al arrancar, así que dos integrantes que corran `-Psupabase` a la vez se borran el schema mutuamente. Mientras no haya un lock (ver `docs/mejoras.md`), la suite contra Supabase la corre solo el responsable de `vehiculos`.
-- **Etapa 6 (escrituras):** los tests nuevos van con `@PruebaIntegracion` (o `@PruebaIntegracionSeed`) y `@Transactional`, para que se revierta. Una escritura que se confirme queda en la base durante el resto de la corrida y rompe los tests que esperan la base vacía; en Supabase, además, el contexto es uno solo por JVM. Un test con seed que no use `@PruebaIntegracionSeed` correría en la JVM sin seed y la ensuciaría.
-- **Contextos:** la suite tiene 5 contextos (2 con base y 3 `@WebMvcTest`). Antes de agregar una configuración propia a un test de integración (un `@Import`, un `@MockitoBean`, otro perfil), considerar que crea un contexto nuevo: en Supabase limpia el schema otra vez y suma 2 conexiones al session pooler.
+- **[Resuelto en la etapa 6]** **Etapa 6 (escrituras):** los tests nuevos van con `@PruebaIntegracion` (o `@PruebaIntegracionSeed`) y `@Transactional`, para que se revierta. Una escritura que se confirme queda en la base durante el resto de la corrida y rompe los tests que esperan la base vacía; en Supabase, además, el contexto es uno solo por JVM. Un test con seed que no use `@PruebaIntegracionSeed` correría en la JVM sin seed y la ensuciaría.
+- **Contextos:** la suite tiene 5 contextos (2 con base y 3 `@WebMvcTest`); desde la etapa 7 son 6 (4 `@WebMvcTest`). Antes de agregar una configuración propia a un test de integración (un `@Import`, un `@MockitoBean`, otro perfil), considerar que crea un contexto nuevo: en Supabase limpia el schema otra vez y suma 2 conexiones al session pooler.
 - **No probado:** el mensaje de "proyecto pausado" de la estrategia de limpieza. Probarlo la próxima vez que el proyecto esté pausado, antes de reactivarlo.
 
 Decisiones de la etapa 5.1 que las etapas siguientes deben respetar:
@@ -708,11 +708,11 @@ Decisiones de la etapa 5.1 que las etapas siguientes deben respetar:
 Está hecho: `@RequiereClaveServicio`, `ClaveServicioInterceptor` y `ClaveServicioInvalidaException` en `api.seguridad`, `WebConfig`, `AltaVehiculoRequest`, `ActualizacionVehiculoRequest`, `AltaVehiculoService`, `ActualizacionVehiculoService`, el comando `AltaVehiculo`, `DatosInvalidosException`, `POST /vehiculos` y `PUT /vehiculos/{id}`. `verify` pasa en Testcontainers (283 tests, ~19 s) y con `-Psupabase` (283 tests, 52 s). Se probó con `curl` contra Supabase el 2026-10-10 (casos 4 a 9 y 12 de la sección 12, más historial con unidades sembradas). Lo que quedó:
 
 - **Etapa 7 (fotos):**
-  - **Verificar el orden multipart/401.** `DispatcherServlet` resuelve el multipart (`checkMultipart`) antes de buscar el handler y de correr los interceptores. En `PUT /vehiculos/{id}/foto` el archivo se leería antes de decidir el 401, y un archivo que supere el límite de Spring daría error antes que el 401. Probarlo y decidir (por ejemplo, multipart con resolución diferida) antes de cerrar la etapa.
-  - El endpoint de foto lleva `@RequiereClaveServicio` y `@SecurityRequirement(name = OpenApiConfig.ESQUEMA_CLAVE_SERVICIO)`, como el `POST` y el `PUT`.
-  - `spring.jackson.deserialization.fail-on-unknown-properties: true` es global: si `SupabaseFotoStorage` deserializa respuestas de Storage con el `ObjectMapper` de Spring (por ejemplo, vía `RestClient.Builder`), esos records necesitan `@JsonIgnoreProperties(ignoreUnknown = true)` o fallan con cualquier campo nuevo de Supabase.
-  - Una URL vacía en `Vehiculo.asignarFoto` es un error del servidor (la URL la arma el storage), no de la entrada: no convertir esa `VehiculoInvalidoException` en `DatosInvalidosException`. Debe seguir dando 500.
-  - `FotoVehiculoService` busca la unidad antes (404) y, como el `PUT`, abre la transacción y llama a `guardar` una sola vez.
+  - **[Resuelto en la etapa 7]** **Verificar el orden multipart/401.** `DispatcherServlet` resuelve el multipart (`checkMultipart`) antes de buscar el handler y de correr los interceptores. En `PUT /vehiculos/{id}/foto` el archivo se leería antes de decidir el 401, y un archivo que supere el límite de Spring daría error antes que el 401. Probarlo y decidir (por ejemplo, multipart con resolución diferida) antes de cerrar la etapa.
+  - **[Resuelto en la etapa 7]** El endpoint de foto lleva `@RequiereClaveServicio` y `@SecurityRequirement(name = OpenApiConfig.ESQUEMA_CLAVE_SERVICIO)`, como el `POST` y el `PUT`.
+  - **[Resuelto en la etapa 7: `SupabaseFotoStorage` no deserializa respuestas (`toBodilessEntity`)]** `spring.jackson.deserialization.fail-on-unknown-properties: true` es global: si `SupabaseFotoStorage` deserializa respuestas de Storage con el `ObjectMapper` de Spring (por ejemplo, vía `RestClient.Builder`), esos records necesitan `@JsonIgnoreProperties(ignoreUnknown = true)` o fallan con cualquier campo nuevo de Supabase.
+  - **[Resuelto en la etapa 7]** Una URL vacía en `Vehiculo.asignarFoto` es un error del servidor (la URL la arma el storage), no de la entrada: no convertir esa `VehiculoInvalidoException` en `DatosInvalidosException`. Debe seguir dando 500.
+  - **[Resuelto en la etapa 7, con una transacción corta después de subir: ver los pendientes de la etapa 7]** `FotoVehiculoService` busca la unidad antes (404) y, como el `PUT`, abre la transacción y llama a `guardar` una sola vez.
 - **Documentación (§3.3, §5.3, §6, §12):**
   - §3.3 y §5.3: un campo desconocido en el cuerpo da `422 VALIDACION` con `errores: [{campo: "<nombre>", mensaje: "campo no admitido"}]`, tanto en el `POST` como en el `PUT` (el flag de Jackson es global). Un `JSON_INVALIDO` 400 queda solo para cuerpos que no se pueden leer.
   - §5.3: el `PUT` sin `precio` ni `disponible` (`{}`, o ambos en `null`) responde `errores: [{campo: "precioODisponible", mensaje: "hay que informar precio, disponible o ambos"}]`.
@@ -733,6 +733,33 @@ Decisiones de la etapa 6 que las etapas siguientes deben respetar:
 - Un `PUT` que no cambia nada no llama a `guardar` (no renueva `actualizado_en`). El historial solo se escribe si el precio cambió según `compareTo`.
 - La comparación del precio se hace después de aplicar `actualizarPrecio`, sobre el precio normalizado por el dominio: la regla del precio no se reimplementa en el servicio.
 - Los tests de escritura que necesitan confirmar (como `AtomicidadActualizacionTest`) insertan con JDBC ids fijos `c0000000-…` y los borran en `@AfterEach`; el resto va con `@Transactional`.
+
+---
+
+### Pendientes que dejó la etapa 7 (fotos)
+
+Está hecho: `TipoFoto`, `ArchivoFoto` y el puerto `FotoStorage` en el dominio; `FotoVehiculoService`; `SupabaseFotoStorage`, `FotoStorageDeshabilitado` y `FotoStorageConfig` en `infrastructure.storage`; `PUT /vehiculos/{id}/foto` y los mapeos de `FOTO_INVALIDA`, `ALMACENAMIENTO_NO_DISPONIBLE` y `MaxUploadSizeExceededException`. `verify` pasa en Testcontainers (346 tests, ~18 s) y con `-Psupabase` (346 tests, 53 s). Se probó con `curl` contra Supabase el 2026-10-10 (casos 10 y 11 de la sección 12, PDF renombrado `.png`, reemplazo PNG→JPG, 2,5 MB, 4 MB con y sin clave, y modo `deshabilitado`). El contrato de Storage de la sección 7 funcionó sin ajustes. Lo que quedó:
+
+- **Desvío de §8:** el puerto quedó `eliminar(String fotoUrl)` y no `eliminar(UUID)`: con el id solo no se sabe la extensión del objeto viejo. El storage arma la URL en `guardar` y la interpreta en `eliminar`; una URL que no es suya (otro proyecto o bucket) se ignora. Actualizar el diagrama.
+- **Actualizar §7 y §12:**
+  - Orden de errores del `PUT` de foto: 401 → 404 → 422 → 503, también en modo `deshabilitado` (el servicio no conoce el modo).
+  - `spring.servlet.multipart`: `max-file-size` y `max-request-size` en 3 MB y `resolve-lazily: true`. Entre 2 y 3 MB rechaza el servicio y por encima de 3 MB rechaza Spring; los dos responden 422 `FOTO_INVALIDA`. El archivo se lee después del interceptor, así que el 401 sale primero.
+  - La llamada HTTP a Storage va fuera de la transacción. Después de subir, una transacción corta (`TransactionOperations`) vuelve a leer la unidad, asigna la foto y guarda una vez: así no se pisa un cambio de precio hecho durante la subida.
+  - El objeto viejo se borra después de confirmar, solo si la URL cambió (cambió la extensión). Si el borrado falla, WARN y 200: queda huérfano.
+  - Storage responde un objeto inexistente con HTTP 400 y `"statusCode":"404"`, `NoSuchKey` en el cuerpo.
+  - La CDN (Cloudflare) siguió sirviendo el `.png` borrado con 200 (`cf-cache-status: HIT`) mientras el origen ya daba `NoSuchKey`. Para verificar un borrado: listar el bucket (`POST /storage/v1/object/list/{bucket}`) o pedir la URL con `?v=...`. Mejora anotada en `docs/mejoras.md`.
+  - Pruebas: `@PruebaIntegracion` corre con `RANDOM_PORT` e importa `FotoStorageEnMemoria` (`@Primary`, como `RelojDePrueba`, con `reiniciar()`). `FotoApiTest` usa el servidor real para los límites multipart (MockMvc no los aplica). La suite tiene ahora 6 contextos: 2 con base y 4 `@WebMvcTest` (`SecretosEnLogsTest` suma uno, sin base).
+- **Etapa 8 (Docker):** Tomcat descarta como máximo 2 MB del cuerpo de un request rechazado (`server.tomcat.max-swallow-size`). Un 401 a una subida de más de 2 MB puede cerrar la conexión; con `curl` en local llegó el 401 bien. Comprobarlo detrás del contenedor.
+- **Etapa 9 (punta a punta):**
+  - Repetir los casos 10 y 11 sobre el contenedor (Postman, Body multipart, campo `archivo`).
+  - La prueba de la etapa 7 dejó la unidad `93a56a83-07fd-452e-be77-378d31d4e948` con `foto_url` apuntando a `93a56a83-….jpg`, que ya se borró del bucket. Para limpiar: `UPDATE vehiculos.vehiculo SET foto_url = NULL WHERE id = '93a56a83-07fd-452e-be77-378d31d4e948'` (junto con la limpieza de la etapa 6).
+
+Decisiones de la etapa 7 que las etapas siguientes deben respetar:
+
+- El tipo se detecta por los primeros bytes (JPEG, PNG, WebP). El Content-Type y el nombre que manda el cliente se ignoran; la extensión y el Content-Type de la subida salen del tipo detectado.
+- El máximo del servicio es 2 MiB (2 097 152 bytes), inclusive.
+- Las implementaciones de `FotoStorage` son de visibilidad de paquete; se eligen con `switch` sobre `VehiculosProperties.modoFotos()`, no con `@ConditionalOnProperty`.
+- Los errores de `RestClient` se loguean con operación, objeto, status y cuerpo de la respuesta, nunca con headers. `SecretosEnLogsTest` lo cubre.
 
 ---
 

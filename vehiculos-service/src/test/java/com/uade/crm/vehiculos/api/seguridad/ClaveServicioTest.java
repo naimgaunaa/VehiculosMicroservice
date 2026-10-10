@@ -34,6 +34,7 @@ import com.uade.crm.vehiculos.api.VehiculoController;
 import com.uade.crm.vehiculos.application.ActualizacionVehiculoService;
 import com.uade.crm.vehiculos.application.AltaVehiculoService;
 import com.uade.crm.vehiculos.application.ConsultaVehiculoService;
+import com.uade.crm.vehiculos.application.FotoVehiculoService;
 import com.uade.crm.vehiculos.domain.model.Caja;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
 
@@ -59,6 +60,9 @@ class ClaveServicioTest {
 
     @MockitoBean
     private ActualizacionVehiculoService actualizacion;
+
+    @MockitoBean
+    private FotoVehiculoService fotos;
 
     @Test
     void altaSinClaveResponde401() throws Exception {

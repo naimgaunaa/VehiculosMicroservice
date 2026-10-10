@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import com.uade.crm.vehiculos.PruebaWebMvc;
 
@@ -156,6 +157,18 @@ class ApiExceptionHandlerTest {
         assertThat(cuerpo).doesNotContain("clave-de-la-base").doesNotContain("IllegalStateException");
     }
 
+    @Test
+    void archivoQueSuperaElLimiteDeSpringResponde422FotoInvalida() throws Exception {
+        mvc.perform(get("/prueba/archivo-grande"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value(TYPE_BASE + "foto-invalida"))
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.codigo").value("FOTO_INVALIDA"))
+                .andExpect(jsonPath("$.detail").value("La foto supera el tamaño máximo de 2 MB"))
+                .andExpect(jsonPath("$.correlationId").isNotEmpty());
+    }
+
     @RestController
     @RequestMapping("/prueba")
     static class ControladorDePrueba {
@@ -177,6 +190,11 @@ class ApiExceptionHandlerTest {
 
         @GetMapping("/vehiculos/{id}")
         void porId(@PathVariable UUID id) {
+        }
+
+        @GetMapping("/archivo-grande")
+        void archivoGrande() {
+            throw new MaxUploadSizeExceededException(3 * 1024 * 1024);
         }
 
         @GetMapping("/error")

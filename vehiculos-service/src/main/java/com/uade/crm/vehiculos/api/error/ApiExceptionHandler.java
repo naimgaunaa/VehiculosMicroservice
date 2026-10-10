@@ -34,11 +34,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import com.uade.crm.vehiculos.api.seguridad.ClaveServicioInvalidaException;
 import com.uade.crm.vehiculos.application.DatosInvalidosException;
 import com.uade.crm.vehiculos.config.CorrelationIdFilter;
+import com.uade.crm.vehiculos.domain.model.AlmacenamientoNoDisponibleException;
+import com.uade.crm.vehiculos.domain.model.FotoInvalidaException;
 import com.uade.crm.vehiculos.domain.model.VehiculoNoEncontradoException;
 
 /**
@@ -53,6 +56,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final String DETALLE_VALIDACION = "Hay campos que no cumplen las validaciones";
     private static final String DETALLE_INTERNO = "Ocurrió un error inesperado";
+    private static final String DETALLE_FOTO_GRANDE = "La foto supera el tamaño máximo de 2 MB";
 
     /** Un campo que no pasó la validación, tal como viaja en {@code errores}. */
     public record CampoInvalido(String campo, String mensaje) {
@@ -110,6 +114,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return responder(CodigoError.JSON_INVALIDO, "El cuerpo de la solicitud no es un JSON válido", request);
     }
 
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        return responder(CodigoError.FOTO_INVALIDA, DETALLE_FOTO_GRANDE, request);
+    }
+
     /** Resto de los 4xx que resuelve Spring MVC (método no permitido, ruta inexistente, tipo no soportado...). */
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
@@ -135,6 +145,17 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(DatosInvalidosException.class)
     public ResponseEntity<Object> handleDatosInvalidos(DatosInvalidosException ex, WebRequest request) {
         return responder(CodigoError.VALIDACION, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(FotoInvalidaException.class)
+    public ResponseEntity<Object> handleFotoInvalida(FotoInvalidaException ex, WebRequest request) {
+        return responder(CodigoError.FOTO_INVALIDA, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(AlmacenamientoNoDisponibleException.class)
+    public ResponseEntity<Object> handleAlmacenamientoNoDisponible(AlmacenamientoNoDisponibleException ex,
+            WebRequest request) {
+        return responder(CodigoError.ALMACENAMIENTO_NO_DISPONIBLE, ex.getMessage(), request);
     }
 
     @ExceptionHandler(Exception.class)

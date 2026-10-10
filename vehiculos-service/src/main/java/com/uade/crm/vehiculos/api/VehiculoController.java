@@ -1,5 +1,6 @@
 package com.uade.crm.vehiculos.api;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.uade.crm.vehiculos.api.dto.ActualizacionVehiculoRequest;
@@ -34,6 +37,7 @@ import com.uade.crm.vehiculos.application.ActualizacionVehiculoService;
 import com.uade.crm.vehiculos.application.AltaVehiculo;
 import com.uade.crm.vehiculos.application.AltaVehiculoService;
 import com.uade.crm.vehiculos.application.ConsultaVehiculoService;
+import com.uade.crm.vehiculos.application.FotoVehiculoService;
 import com.uade.crm.vehiculos.config.OpenApiConfig;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
 
@@ -47,12 +51,14 @@ public class VehiculoController {
     private final ConsultaVehiculoService consulta;
     private final AltaVehiculoService alta;
     private final ActualizacionVehiculoService actualizacion;
+    private final FotoVehiculoService fotos;
 
     public VehiculoController(ConsultaVehiculoService consulta, AltaVehiculoService alta,
-            ActualizacionVehiculoService actualizacion) {
+            ActualizacionVehiculoService actualizacion, FotoVehiculoService fotos) {
         this.consulta = consulta;
         this.alta = alta;
         this.actualizacion = actualizacion;
+        this.fotos = fotos;
     }
 
     @GetMapping
@@ -148,5 +154,32 @@ public class VehiculoController {
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
     public VehiculoResponse actualizar(@PathVariable UUID id, @Valid @RequestBody ActualizacionVehiculoRequest pedido) {
         return VehiculoResponse.de(actualizacion.actualizar(id, pedido.precio(), pedido.disponible()));
+    }
+
+    @PutMapping(value = "/{id}/foto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequiereClaveServicio
+    @SecurityRequirement(name = OpenApiConfig.ESQUEMA_CLAVE_SERVICIO)
+    @Operation(summary = "Carga o reemplaza la foto de una unidad",
+            description = "Multipart con el campo `archivo`: JPEG, PNG o WebP de hasta 2 MB. El tipo se detecta por "
+                    + "el contenido, no por el nombre ni por el Content-Type del archivo.")
+    @ApiResponse(responseCode = "200", description = "La unidad con su `fotoUrl`")
+    @ApiResponse(responseCode = "400", description = "Falta el campo `archivo` o el id no es UUID (SOLICITUD_INVALIDA)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "401", description = "Falta `X-Api-Key` o no es válida (CLAVE_SERVICIO_INVALIDA)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "404", description = "No existe la unidad (VEHICULO_NO_ENCONTRADO)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "415", description = "El cuerpo no es multipart/form-data (SOLICITUD_INVALIDA)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "422", description = "No es JPEG, PNG o WebP, está vacío o supera 2 MB (FOTO_INVALIDA)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "500", description = "Error interno (ERROR_INTERNO)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "503", description = "Storage no responde, rechazó la subida o está deshabilitado "
+            + "(ALMACENAMIENTO_NO_DISPONIBLE)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    public VehiculoResponse asignarFoto(@PathVariable UUID id, @RequestParam("archivo") MultipartFile archivo)
+            throws IOException {
+        return VehiculoResponse.de(fotos.asignar(id, archivo.getBytes()));
     }
 }
