@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -35,6 +36,8 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import com.uade.crm.vehiculos.api.seguridad.ClaveServicioInvalidaException;
+import com.uade.crm.vehiculos.application.DatosInvalidosException;
 import com.uade.crm.vehiculos.config.CorrelationIdFilter;
 import com.uade.crm.vehiculos.domain.model.VehiculoNoEncontradoException;
 
@@ -124,6 +127,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return responder(CodigoError.VEHICULO_NO_ENCONTRADO, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(ClaveServicioInvalidaException.class)
+    public ResponseEntity<Object> handleClaveServicioInvalida(ClaveServicioInvalidaException ex, WebRequest request) {
+        return responder(CodigoError.CLAVE_SERVICIO_INVALIDA, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(DatosInvalidosException.class)
+    public ResponseEntity<Object> handleDatosInvalidos(DatosInvalidosException ex, WebRequest request) {
+        return responder(CodigoError.VALIDACION, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleError(Exception ex, WebRequest request) {
         log.error("Error no controlado al procesar {}", ruta(request), ex);
@@ -163,6 +176,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     private static String mensajeDeConversion(MismatchedInputException ex) {
+        if (ex instanceof UnrecognizedPropertyException) {
+            return "campo no admitido";
+        }
         if (ex instanceof InvalidFormatException formato && formato.getTargetType() != null
                 && formato.getTargetType().isEnum()) {
             String aceptados = Arrays.stream(formato.getTargetType().getEnumConstants())
