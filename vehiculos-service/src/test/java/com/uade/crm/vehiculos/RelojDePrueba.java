@@ -6,7 +6,10 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 
+import org.springframework.context.annotation.Primary;
+
 /** Reloj que arranca en un instante fijo y solo avanza cuando el test lo pide. */
+@Primary
 public final class RelojDePrueba extends Clock {
 
     /** Año actual 2026, por lo que el máximo aceptado por el Builder es 2027. */

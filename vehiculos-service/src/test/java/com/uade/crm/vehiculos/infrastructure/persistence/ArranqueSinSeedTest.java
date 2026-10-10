@@ -7,12 +7,8 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.exception.FlywayValidateException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 
-import com.uade.crm.vehiculos.PostgresDePrueba;
-import com.uade.crm.vehiculos.PropiedadesDePrueba;
+import com.uade.crm.vehiculos.PruebaIntegracionSeed;
 
 /**
  * Una base que ya recibió el seed tiene la repetible en {@code flyway_schema_history}. Al arrancar después sin el
@@ -20,10 +16,7 @@ import com.uade.crm.vehiculos.PropiedadesDePrueba;
  * Comparte contexto con {@link SeedTest} (mismas anotaciones), así que la base de este test ya está sembrada.
  * Copia la configuración de Flyway que armó Spring y solo cambia las locations.
  */
-@SpringBootTest
-@Import(PostgresDePrueba.class)
-@PropiedadesDePrueba
-@ActiveProfiles({"test", "seed"})
+@PruebaIntegracionSeed
 class ArranqueSinSeedTest {
 
     @Autowired
