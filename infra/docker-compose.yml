@@ -1,0 +1,28 @@
+# Uso: docker compose -f infra/docker-compose.yml up --build (lee infra/.env, junto a este archivo).
+services:
+  vehiculos:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: vehiculos-service:local
+    ports:
+      - "8083:8083"
+    environment:
+      # Fijo a propósito: el seed no se carga desde el contenedor (regla 4 de CLAUDE.md, base compartida).
+      SPRING_PROFILES_ACTIVE: docker
+      VEHICULOS_DB_URL: ${VEHICULOS_DB_URL:?Falta VEHICULOS_DB_URL (JDBC del session pooler de Supabase, puerto 5432). Completala en infra/.env}
+      VEHICULOS_DB_USUARIO: ${VEHICULOS_DB_USUARIO:?Falta VEHICULOS_DB_USUARIO (vehiculos_app.<project-ref>). Completala en infra/.env}
+      VEHICULOS_DB_CLAVE: ${VEHICULOS_DB_CLAVE:?Falta VEHICULOS_DB_CLAVE (contraseña del rol vehiculos_app). Completala en infra/.env}
+      VEHICULOS_FOTOS_MODO: ${VEHICULOS_FOTOS_MODO:?Falta VEHICULOS_FOTOS_MODO (supabase o deshabilitado). Completala en infra/.env}
+      VEHICULOS_FOTOS_BUCKET: ${VEHICULOS_FOTOS_BUCKET:?Falta VEHICULOS_FOTOS_BUCKET (bucket público de fotos). Completala en infra/.env}
+      VEHICULOS_CLAVE_ESCRITURA: ${VEHICULOS_CLAVE_ESCRITURA:?Falta VEHICULOS_CLAVE_ESCRITURA (mínimo 32 caracteres, header X-Api-Key). Completala en infra/.env}
+      VEHICULOS_SUPABASE_URL: ${VEHICULOS_SUPABASE_URL:-}
+      VEHICULOS_SUPABASE_CLAVE_SECRETA: ${VEHICULOS_SUPABASE_CLAVE_SECRETA:-}
+    restart: on-failure:3
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8083/actuator/health"]
+      start_period: 60s
+      start_interval: 3s
+      interval: 15s
+      timeout: 5s
+      retries: 4

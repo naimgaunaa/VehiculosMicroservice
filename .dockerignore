@@ -1,0 +1,15 @@
+# Lista blanca: el contexto es la raíz del repo y no puede llevar infra/.env ni otros secretos.
+*
+!pom.xml
+!vehiculos-service/pom.xml
+!vehiculos-service/src/main/
+
+**/.env
+**/.env.*
+**/target/
+.git/
+.idea/
+.vscode/
+.claude/
+.agents/
+*.log

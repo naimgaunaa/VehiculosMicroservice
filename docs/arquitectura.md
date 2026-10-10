@@ -571,7 +571,7 @@ El esqueleto arrancó contra Supabase real el 2026-10-08: el session pooler acep
   - **[Resuelto en la etapa 4]** Supabase corre PostgreSQL 17 (el log de arranque dice 17.11). `PostgresDePrueba` usa `postgres:17-alpine` y la sección 14 ya lo dice. La línea de Stack de `CLAUDE.md` también dice `postgres:17-alpine`.
   - **[Resuelto: verificado en la etapa 7]** Al arrancar contra Supabase el 2026-10-10, Flyway validó 2 migraciones (la V1 y el seed) y no apareció el WARN `No migrations found`. `vehiculos.flyway_schema_history` ya existe en la base compartida, creada sin migraciones. La `V1__vehiculo.sql` no crea esa tabla. El WARN `No migrations found` del arranque desaparece cuando la V1 se aplique en Supabase (ver etapa 9 en los pendientes de la etapa 4).
 - **Etapa 8 (Docker):**
-  - springdoc queda habilitado: el arranque avisa con WARN que conviene deshabilitarlo en producción, pero Postman importa `/v3/api-docs`. No hace falta tocarlo en el TP.
+  - **[Resuelto en la etapa 8: se mantiene habilitado; el contenedor muestra los dos WARN de springdoc y nada más]** springdoc queda habilitado: el arranque avisa con WARN que conviene deshabilitarlo en producción, pero Postman importa `/v3/api-docs`. No hace falta tocarlo en el TP.
 - **Etapa 9 (punta a punta):**
   - `scripts/cargar-env.ps1` nunca se ejecutó en PowerShell: se desarrolló y probó solo `cargar-env.sh`, en Linux. Probarlo en Windows antes de la demo.
   - `curl` a `/swagger-ui.html` responde 302 hacia `/swagger-ui/index.html`. Usar `curl -L` o abrirlo en el navegador.
@@ -601,9 +601,9 @@ Especificaciones de la etapa 1 que las etapas siguientes deben respetar:
   - **[Resuelto en la etapa 7]** Elegir el `FotoStorage` con `VehiculosProperties.modoFotos()` (enum). No usar `@ConditionalOnProperty(havingValue = "supabase")`: distingue mayúsculas y `VEHICULOS_FOTOS_MODO=SUPABASE` dejaría el contexto sin bean.
   - **[Resuelto en la etapa 7: `SecretosEnLogsTest`]** Falta el test de la sección 12 que verifica que ni la clave de Supabase ni la de escritura aparecen en los logs (hoy solo se prueba `toString`). Al loguear errores de `RestClient`, no volcar headers (`apikey`).
 - **Etapa 8 (Docker):**
-  - En el compose, `VEHICULOS_SUPABASE_URL` y `VEHICULOS_SUPABASE_CLAVE_SECRETA` van con `${VAR:-}` y no con `${VAR:?}`: son opcionales en modo `deshabilitado`.
-  - El perfil `docker` de la sección 10 no existe (solo hay `application-local.yml`): crear `application-docker.yml` o confirmar que las variables del compose alcanzan.
-  - `VehiculosProperties` no valida `VEHICULOS_DB_*` (las resuelve `spring.datasource`). Un `.env` copiado de `.env.example` sin completar el host falla recién al conectar.
+  - **[Resuelto en la etapa 8]** En el compose, `VEHICULOS_SUPABASE_URL` y `VEHICULOS_SUPABASE_CLAVE_SECRETA` van con `${VAR:-}` y no con `${VAR:?}`: son opcionales en modo `deshabilitado`.
+  - **[Resuelto en la etapa 8: se creó `application-docker.yml`, porque sin `local` activo no hay datasource]** El perfil `docker` de la sección 10 no existe (solo hay `application-local.yml`): crear `application-docker.yml` o confirmar que las variables del compose alcanzan.
+  - **[Resuelto en la etapa 8: no se valida. La validación en `VehiculosProperties` no corre antes de que Flyway y JPA se conecten y se revirtió; el error del arranque ya nombra el placeholder (`UnknownHostException: <host-pooler>`, `tenant/user vehiculos_app.<project-ref> not found`). Ver `docs/mejoras.md`]** `VehiculosProperties` no valida `VEHICULOS_DB_*` (las resuelve `spring.datasource`). Un `.env` copiado de `.env.example` sin completar el host falla recién al conectar.
 - **Etapa 9 (punta a punta):** la etapa 2 se probó solo con MockMvc. Falta ejecutar con Supabase real: `curl` a `/actuator/health` y a una ruta inexistente con `X-Correlation-Id`, y comprobar que sin `VEHICULOS_CLAVE_ESCRITURA` el servicio no arranca.
 
 ### Pendientes que dejó la etapa 3 (dominio)
@@ -674,7 +674,7 @@ Está hecho: `db/seed/R__seed_vehiculos.sql`, `application-seed.yml` y `SeedTest
   - **[Resuelto: verificado en la etapa 7 con el Sandero, `true` y de vuelta a `false`; el historial siguió en 1 fila]** Un `PUT` que solo cambia `disponible` sobre una unidad sembrada no debe agregar fila al historial.
   - Antes de borrar el seed con SQL, ver la nota "Para limpiar el seed" más abajo: las filas de historial agregadas por la API no tienen el prefijo `b0000000`.
 - **[Resuelto en la etapa 7: probado con el Fiesta, `fotoUrl` pasó de `null` a la URL pública y el objeto se borró después del bucket]** **Etapa 7 (fotos):** las unidades sembradas tienen `foto_url = NULL`. Probar `PUT /vehiculos/{id}/foto` sobre una de ellas y comprobar que `fotoUrl` pasa a tener valor. Esto cambia el seed en esa base: al limpiar o recargar, el objeto del bucket `vehiculos-fotos` (`{vehiculoId}.{ext}`) queda huérfano y hay que borrarlo a mano.
-- **Etapa 8 (Docker):** decidir si el compose acepta `SPRING_PROFILES_ACTIVE=docker,seed` (el `application-seed.yml` ya sirve sin cambios) o si el seed queda solo para `local`. Si se permite, el contenedor apunta a la misma base compartida: aplica lo mismo que en la etapa 5 (avisar al equipo).
+- **[Resuelto en la etapa 8: el seed queda solo para `local`; el compose fija `SPRING_PROFILES_ACTIVE: docker`]** **Etapa 8 (Docker):** decidir si el compose acepta `SPRING_PROFILES_ACTIVE=docker,seed` (el `application-seed.yml` ya sirve sin cambios) o si el seed queda solo para `local`. Si se permite, el contenedor apunta a la misma base compartida: aplica lo mismo que en la etapa 5 (avisar al equipo).
 - **Etapa 9 (punta a punta):** repetir la lista de la etapa 5 sobre el contenedor, partiendo de la base con el seed ya cargado. Chequear también que el WARN `No migrations found` sigue sin aparecer y que `flyway_schema_history` no tiene filas fallidas.
 - **Resueltos al cerrar el seed:** `CLAUDE.md` ya dice `postgres:17-alpine` en la línea de Stack, y las pruebas manuales se hacen con Postman (`CLAUDE.md` y este documento lo dicen en todos lados; si aparece "Insomnia" en algún lugar nuevo, corregirlo).
 - **Si se edita el seed:** Flyway lo vuelve a ejecutar (cambia el checksum), pero `ON CONFLICT DO NOTHING` no actualiza filas existentes. Para corregir un dato ya cargado: borrar las filas por id (primero `precio_historial`, después `vehiculo`) y volver a correr con `seed`. Nunca editar la `V1` por esto.
@@ -755,7 +755,7 @@ Está hecho: `TipoFoto`, `ArchivoFoto` y el puerto `FotoStorage` en el dominio; 
   - Storage responde un objeto inexistente con HTTP 400 y `"statusCode":"404"`, `NoSuchKey` en el cuerpo.
   - La CDN (Cloudflare) siguió sirviendo el `.png` borrado con 200 (`cf-cache-status: HIT`) mientras el origen ya daba `NoSuchKey`. Para verificar un borrado: listar el bucket (`POST /storage/v1/object/list/{bucket}`) o pedir la URL con `?v=...`. Mejora anotada en `docs/mejoras.md`.
   - Pruebas: `@PruebaIntegracion` corre con `RANDOM_PORT` e importa `FotoStorageEnMemoria` (`@Primary`, como `RelojDePrueba`, con `reiniciar()`). `FotoApiTest` usa el servidor real para los límites multipart (MockMvc no los aplica). La suite tiene ahora 6 contextos: 2 con base y 4 `@WebMvcTest` (`SecretosEnLogsTest` suma uno, sin base).
-- **Etapa 8 (Docker):** Tomcat descarta como máximo 2 MB del cuerpo de un request rechazado (`server.tomcat.max-swallow-size`). Un 401 a una subida de más de 2 MB puede cerrar la conexión; con `curl` en local llegó el 401 bien. Comprobarlo detrás del contenedor.
+- **[Resuelto en la etapa 8: a través del contenedor, 4 MB sin clave dieron 401 sin cortar la conexión, y con clave 422 `FOTO_INVALIDA`]** **Etapa 8 (Docker):** Tomcat descarta como máximo 2 MB del cuerpo de un request rechazado (`server.tomcat.max-swallow-size`). Un 401 a una subida de más de 2 MB puede cerrar la conexión; con `curl` en local llegó el 401 bien. Comprobarlo detrás del contenedor.
 - **Etapa 9 (punta a punta):**
   - Repetir los casos 10 y 11 sobre el contenedor (Postman, Body multipart, campo `archivo`).
   - La prueba de la etapa 7 dejó la unidad `93a56a83-07fd-452e-be77-378d31d4e948` con `foto_url` apuntando a `93a56a83-….jpg`, que ya se borró del bucket. Para limpiar: `UPDATE vehiculos.vehiculo SET foto_url = NULL WHERE id = '93a56a83-07fd-452e-be77-378d31d4e948'` (junto con la limpieza de la etapa 6).
@@ -767,6 +767,38 @@ Decisiones de la etapa 7 que las etapas siguientes deben respetar:
 - El máximo del servicio es 2 MiB (2 097 152 bytes), inclusive.
 - Las implementaciones de `FotoStorage` son de visibilidad de paquete; se eligen con `switch` sobre `VehiculosProperties.modoFotos()`, no con `@ConditionalOnProperty`.
 - Los errores de `RestClient` se loguean con operación, objeto, status y cuerpo de la respuesta, nunca con headers. `SecretosEnLogsTest` lo cubre.
+
+### Pendientes que dejó la etapa 8 (Docker)
+
+Está hecho: `Dockerfile` y `.dockerignore` en la raíz, `infra/docker-compose.yml`, `application-docker.yml` y el salto de línea final de `infra/.env.example`. El código de la aplicación no cambió. `verify` pasa en Testcontainers (346 tests) y con `-Psupabase` (346 tests, 57 s), sin diferencias entre las dos corridas. Se probó el contenedor contra Supabase el 2026-10-10:
+
+- Quedó `healthy` en 11 s (la app arrancó en unos 7 s) y `/actuator/health` respondió 200 `UP`.
+- Casos 1, 2, 4, 7 y 10 de la sección 12 bien.
+- Una subida de 4 MB sin clave dio 401 y con clave dio 422.
+- En `docker logs` no aparece ninguna credencial ni `No migrations found`. Flyway validó 2 migraciones y los únicos WARN son los dos de springdoc.
+- Sin `VEHICULOS_CLAVE_ESCRITURA` no arranca: el compose falla al interpolar y la app, lanzada con `docker run`, termina con exit 1.
+- La imagen corre como `vehiculos` (uid 10001). El build solo recibe los dos `pom.xml` y `src/main`: un `.env` de prueba puesto en `src/main/resources` quedó afuera.
+
+Lo que quedó:
+
+- **Etapa 9 (punta a punta):**
+  - La prueba de la etapa 8 dejó en `vehiculos` la unidad `ec1b5aae-2202-4ea6-8c4a-be64b8d3796a` (marca "Ficticia", modelo "Contenedor", 1 fila de historial), con la foto `ec1b5aae-2202-4ea6-8c4a-be64b8d3796a.png` en el bucket `vehiculos-fotos`. Para limpiar, junto con la limpieza de las etapas 6 y 7: `DELETE FROM vehiculos.precio_historial WHERE vehiculo_id = 'ec1b5aae-2202-4ea6-8c4a-be64b8d3796a'`, después `DELETE FROM vehiculos.vehiculo WHERE id = 'ec1b5aae-2202-4ea6-8c4a-be64b8d3796a'`, y borrar el objeto del bucket. Los conteos de la etapa 5 (`?disponible=true`) suben en 1 hasta limpiarla.
+  - De la lista de la etapa 2 ya se probaron sobre el contenedor `/actuator/health` y el arranque sin `VEHICULOS_CLAVE_ESCRITURA`. Falta `curl` a una ruta inexistente con `X-Correlation-Id`.
+  - Sigue pendiente revisar que `flyway_schema_history` no tenga filas fallidas (pendiente del seed).
+- **Comentario de `application.yml` desactualizado:** dice que si falta una variable Spring falla con `Could not resolve placeholder`. En la prueba, sin `VEHICULOS_CLAVE_ESCRITURA`, el binding recibió el texto literal `${VEHICULOS_CLAVE_ESCRITURA}` y lo rechazó `VehiculosProperties` ("debe tener al menos 32 caracteres" y "tiene un placeholder sin completar"). El servicio no arranca igual; corregir el comentario cuando se toque ese archivo.
+- **Variables del shell y compose:** si la terminal tiene las `VEHICULOS_*` cargadas (`cargar-env.sh`), compose usa esas antes que las de `infra/.env` o `--env-file`. Para levantar con las del archivo, usar una terminal sin cargarlas.
+- **Flyway en el contenedor:** el perfil `docker` no tiene el seed, pero aplica `db/migration` al arrancar. Antes de mergear una `V2`, decidir si se deshabilita Flyway en `docker` (ver `docs/mejoras.md`), porque el primer integrante que levante el compose la aplicaría en la base compartida.
+- **Host del pooler en el log:** Flyway imprime la URL JDBC (`aws-1-sa-east-1.pooler.supabase.com`). No es un secreto (usuario y clave van aparte); no hace falta tocarlo.
+
+Decisiones de la etapa 8 que las etapas siguientes deben respetar:
+
+- El compose fija `SPRING_PROFILES_ACTIVE: docker`: el seed no se activa desde el contenedor (regla 4 de `CLAUDE.md`). Se carga solo con `local,seed`.
+- `application-docker.yml` repite el `spring.datasource` de `application-local.yml`. Si se cambia uno, cambiar el otro.
+- `.dockerignore` es una lista blanca: solo entran los dos `pom.xml` y `vehiculos-service/src/main/`, y al final se vuelven a excluir `.env*`, `target/`, `.git/` y los archivos de IDE. Gana la última regla que coincide, así que las exclusiones van después de las habilitaciones. Un archivo nuevo que necesite el build fuera de `src/main` hay que habilitarlo a mano.
+- La imagen se compila con `-DskipTests` y sin `src/test` en el contexto: los tests corren con `mvn verify`, no en el build.
+- Healthcheck: `curl -fsS` a `/actuator/health`, con `start_period: 60s`, `start_interval: 3s`, `interval: 15s`, `timeout: 5s` y `retries: 4`. Durante el arranque los fallos no cuentan y se chequea cada 3 s; ya en marcha hace falta un minuto seguido en `DOWN` para pasar a `unhealthy`.
+- `restart: on-failure:3`: si Supabase está pausado o falta una variable, la app termina al arrancar y no queda en un bucle infinito. Docker no reinicia un contenedor `unhealthy` (eso es solo de Swarm).
+- Las 6 variables obligatorias van con `${VAR:?mensaje}`, que también rechaza un valor vacío. Un `.env` copiado de `.env.example` sin completar falla por `VEHICULOS_DB_CLAVE`.
 
 ---
 

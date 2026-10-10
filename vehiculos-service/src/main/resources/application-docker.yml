@@ -1,0 +1,7 @@
+# Perfil del contenedor (infra/docker-compose.yml) contra el Supabase compartido (session pooler, puerto 5432).
+# Sin local activo no hay datasource: este perfil lo repite. Las variables las pasa el compose desde infra/.env.
+spring:
+  datasource:
+    url: ${VEHICULOS_DB_URL}
+    username: ${VEHICULOS_DB_USUARIO}
+    password: ${VEHICULOS_DB_CLAVE}
