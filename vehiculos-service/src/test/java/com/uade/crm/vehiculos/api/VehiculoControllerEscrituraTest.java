@@ -39,6 +39,7 @@ import com.uade.crm.vehiculos.application.ActualizacionVehiculoService;
 import com.uade.crm.vehiculos.application.AltaVehiculo;
 import com.uade.crm.vehiculos.application.AltaVehiculoService;
 import com.uade.crm.vehiculos.application.ConsultaVehiculoService;
+import com.uade.crm.vehiculos.application.FotoVehiculoService;
 import com.uade.crm.vehiculos.application.DatosInvalidosException;
 import com.uade.crm.vehiculos.domain.model.Caja;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
@@ -65,6 +66,9 @@ class VehiculoControllerEscrituraTest {
 
     @MockitoBean
     private ActualizacionVehiculoService actualizacion;
+
+    @MockitoBean
+    private FotoVehiculoService fotos;
 
     @Test
     void altaValidaResponde201ConLocationYLaUnidad() throws Exception {

@@ -19,9 +19,9 @@ import org.springframework.context.annotation.Import;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-@Import({PostgresDePrueba.class, RelojDePrueba.class})
+@Import({PostgresDePrueba.class, RelojDePrueba.class, FotoStorageEnMemoria.class})
 @PropiedadesDePrueba
 public @interface PruebaIntegracion {
 }
