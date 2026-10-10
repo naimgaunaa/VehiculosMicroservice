@@ -104,7 +104,7 @@ El servicio `clientes` ya está implementado por otro integrante y fija el estil
 - Código, nombres de dominio y mensajes de error en español. Palabras técnicas en inglés.
 - Sin Lombok ni MapStruct. Los DTOs son `record` con un método estático `de(...)` que los construye desde el dominio. Los request recortan los textos en el constructor compacto antes de validar.
 - Las entidades de dominio tienen constructor privado y `builder()` escrito a mano. La persistencia las reconstruye con el mismo builder. Los accesores no usan `get` (`id()`, `precio()`) y los campos opcionales devuelven `Optional`.
-- Puerto de persistencia `VehiculoRepositorio` en `domain.port`. Adaptador `VehiculoRepositorioJpa` (visibilidad de paquete) en `infrastructure.persistence`, que delega en la interfaz Spring Data `VehiculoJpaRepository` y traduce con `aEntidad` y `aDominio`. La entidad JPA `VehiculoEntity` tiene getters y setters de paquete, salvo `getId()` e `isNew()`, que son públicos porque implementa `Persistable<UUID>` (el id lo asigna el dominio; así el alta usa `persist` y no `merge`). `creadoEn` no tiene setter: se fija solo en `VehiculoEntity.nueva(...)`.
+- Puerto de persistencia `VehiculoRepositorio` en `domain.port`. Adaptador `VehiculoRepositorioJpa` (visibilidad de paquete) en `infrastructure.persistence`, que delega en la interfaz Spring Data `VehiculoJpaRepository` y traduce con `aEntidad` y `aDominio`. La entidad JPA `VehiculoEntity` tiene getters y setters de paquete.
 - Un servicio de aplicación por caso de uso, no una fachada única.
 - `Clock` inyectado como bean (`DominioConfig`) para que el tiempo sea testeable.
 - `spring.jpa.open-in-view: false` y `ddl-auto: validate`.
@@ -174,7 +174,7 @@ Ejemplo, vehículo inexistente:
 | `version` | texto (por ejemplo "Exclusive CVT") | No | Versión comercial del modelo. No es la versión de concurrencia: no se usa `@Version` de JPA |
 | `anio` | entero | Sí | |
 | `kilometraje` | entero (km) | Sí | |
-| `precio` | `BigDecimal` | Sí | `NUMERIC(14, 2)`: hasta 12 dígitos enteros y 2 decimales. El dominio lo normaliza a 2 decimales |
+| `precio` | `BigDecimal` | Sí | |
 | `disponible` | booleano | Sí | `true` por defecto en el alta |
 | `caja` | `AUTOMATICA` o `MANUAL` | Sí | Enum `Caja` |
 | `fotoUrl` | texto (URL) | No | URL pública de Storage |
@@ -264,12 +264,12 @@ Respuesta de `GET /vehiculos/{id}/historial-precios`:
 
 ## 6. Reglas de negocio
 
-- **Invariantes** (en `Vehiculo.builder().build()` y al actualizar): precio positivo, con 2 decimales como máximo y 12 dígitos enteros como máximo (la columna es `NUMERIC(14, 2)`; el dominio rechaza lo que la base redondearía o desbordaría y normaliza a escala 2, así `10000000` queda `10000000.00`), kilometraje mayor o igual a 0, marca y modelo no vacíos, `caja` presente, año entre 1950 y el año actual más uno, calculado con el `Clock` inyectado.
+- **Invariantes** (en `Vehiculo.builder().build()` y al actualizar): precio positivo, kilometraje mayor o igual a 0, marca y modelo no vacíos, `caja` presente, año entre 1950 y el año actual más uno, calculado con el `Clock` inyectado.
 - **Doble validación:** los DTOs de request se validan con Bean Validation y devuelven `VALIDACION` con `errores`. El Builder protege al dominio aunque el DTO falle.
 - **Filtrado:** el servidor solo filtra por `disponible`. El front trae la lista completa y filtra en memoria. Sin paginación.
 - **Precio disponible o no:** `GET /vehiculos/{id}/precio` y `GET /vehiculos/{id}` responden `200` aunque `disponible` sea false. `calificacion` puede procesar un lead después de la venta y el front puede mostrar una ficha vieja. `vehiculos` solo informa: la respuesta incluye `disponible` y quien consulta decide qué hacer. Si el id no existe, `404` con `VEHICULO_NO_ENCONTRADO`.
 - **Rendimiento:** `/precio` está en el camino de cada calificación. Es una consulta por clave primaria, sin joins ni caché.
-- **Historial de precios:** `precio_historial` guarda una fila por cada precio que rigió, con `vigente_desde`. Se escribe en la misma transacción que el alta (precio inicial) y que cada `PUT` que cambia el precio. Un `PUT` que solo cambia `disponible`, o que envía el mismo precio, no escribe nada. Es de solo agregado y su fila más reciente coincide siempre con `vehiculo.precio`. `vigente_desde` es estrictamente creciente por unidad: `registrarPrecio` rechaza un instante igual o anterior a la última fila (lanza `IllegalStateException`, que `@Repository` traduce a `InvalidDataAccessApiUsageException`; es un error de programación del servicio y daría 500), porque con dos filas en el mismo instante no se sabría cuál rige.
+- **Historial de precios:** `precio_historial` guarda una fila por cada precio que rigió, con `vigente_desde`. Se escribe en la misma transacción que el alta (precio inicial) y que cada `PUT` que cambia el precio. Un `PUT` que solo cambia `disponible`, o que envía el mismo precio, no escribe nada. Es de solo agregado y su fila más reciente coincide siempre con `vehiculo.precio`.
 - **Fechas:** `creado_en` y `actualizado_en` son `TIMESTAMPTZ` mapeadas como `Instant`, y las fija el servicio con el `Clock`. No viajan en la API.
 - **Sin control de concurrencia optimista:** el último `PUT` gana. Alcanza porque las actualizaciones de precio son raras y las hace una persona.
 
@@ -298,7 +298,7 @@ Flujo de `PUT /vehiculos/{id}/foto`: busca el vehículo (404 si no existe), vali
 | `supabase` | `SupabaseFotoStorage` | Sube y borra en Storage y devuelve la URL pública |
 | `deshabilitado` | `FotoStorageDeshabilitado` | Rechaza la carga con `ALMACENAMIENTO_NO_DISPONIBLE`. Permite correr el servicio sin la clave de Storage |
 
-Los tests usan una implementación falsa en memoria. Ningún test llama a Supabase.
+Los tests usan una implementación falsa en memoria. Ningún test automático llama a Supabase Storage: las subidas reales se prueban a mano.
 
 ---
 
@@ -496,7 +496,8 @@ Un solo modo: el servicio corre en un contenedor y se conecta a Supabase con las
 - El compose tiene solo el servicio `vehiculos`: sin Postgres, porque la base está en Supabase, y sin Kafka, porque el servicio no lo usa. Publica el puerto 8083 al host. Su healthcheck consulta `/actuator/health`.
 - Las variables obligatorias usan `${VAR:?mensaje}`, así que el compose falla con un mensaje claro si falta alguna.
 - `.env.example` va commiteado con placeholders y `.env` real en `.gitignore`.
-- Los tests de integración no usan Supabase: levantan su propio PostgreSQL con Testcontainers, que necesita Docker abierto.
+- Docker se usa solo para levantar el servicio. El contenedor se conecta a la base de Supabase, no a un Postgres local.
+- Los tests de integración por defecto levantan su propio PostgreSQL con Testcontainers, que necesita Docker abierto. La suite contra Supabase es aparte (sección 12).
 
 ---
 
@@ -506,11 +507,20 @@ Un solo modo: el servicio corre en un contenedor y se conecta a Supabase con las
 
 - Unitarias del Builder: cada invariante rechaza el valor inválido y acepta el límite; `caja` ausente falla.
 - Unitarias de los servicios con Mockito.
-- Repositorio y migraciones contra PostgreSQL real con Testcontainers (`PostgresDePrueba` con `@ServiceConnection` y la anotación `@PruebaIntegracion`), incluido el filtro `disponible`. `MigracionesTest` compara cada columna con el SQL de la V1 y con los `@Column` de las entidades (longitud, precisión, escala y nulabilidad, que `ddl-auto: validate` no mira). `SeedTest` cubre el seed con el perfil `seed` (sección 9.3).
+- Repositorio y migraciones contra PostgreSQL real con Testcontainers (`PostgresDePrueba` con `@ServiceConnection` y la anotación `@PruebaIntegracion`), incluido el filtro `disponible`. `SeedTest` cubre el seed con el perfil `seed` (sección 9.3).
 - Controllers con MockMvc (`PruebaWebMvc`): códigos de estado, forma del `ProblemDetail` (`codigo`, `correlationId`, `errores`), `X-Api-Key` faltante o inválida (401 antes de validar el cuerpo) y `caja` fuera del enum (422 con los valores aceptados).
 - Fotos con un `FotoStorage` falso: tipo inválido, tamaño excedido y falla del almacenamiento.
 - Historial: el alta y cada `PUT` que cambia el precio agregan una fila; un `PUT` que solo cambia `disponible` no agrega nada.
 - La clave secreta de Supabase y la de escritura no aparecen en ninguna línea de log.
+
+**Suite contra Supabase (opcional).** La base de `vehiculos` vive en Supabase, así que la misma batería de tests de integración también se puede correr contra ella, sin tocar los datos del equipo:
+
+- `mvn -pl vehiculos-service -am verify` corre en Testcontainers y no necesita credenciales. Es lo que corre cualquier integrante y lo que tiene que pasar siempre.
+- `mvn -pl vehiculos-service -am verify -Psupabase`, con las variables `VEHICULOS_*` cargadas, corre la misma batería contra Supabase en el schema `vehiculos_test`. Nunca contra `vehiculos`, que tiene el seed y los datos del equipo.
+- El schema se crea una sola vez desde el SQL Editor: `CREATE SCHEMA vehiculos_test AUTHORIZATION vehiculos_app;`.
+- Protecciones obligatorias: la suite se niega a arrancar si el schema configurado no es `vehiculos_test`, y solo en ese schema puede borrar y recrear tablas para dejarlo limpio en cada corrida.
+- Cubre la base (migraciones, repositorio, servicios con datos reales). Storage sigue con el `FotoStorage` falso.
+- Es más lenta, necesita red y el proyecto activo (no pausado). Por eso es opt-in y no es parte de `verify` por defecto.
 
 **Manuales con Postman.** Base `http://localhost:8083`. Importar `http://localhost:8083/v3/api-docs` genera la colección. Guardar la `X-Api-Key` en un entorno de Postman y no dentro de cada request. Casos mínimos:
 
@@ -540,6 +550,7 @@ La base, el rol, el schema y el bucket de Supabase ya existen. El orden es:
 3. Dominio: `Vehiculo`, `Caja` y Builder con invariantes.
 4. Persistencia: Flyway, entidades de `vehiculo` y de `precio_historial`, `VehiculoRepositorio` y su adaptador JPA, seed y tests con Testcontainers.
 5. API de lectura: listado, detalle, `/precio` e historial.
+5.1. Suite de tests contra Supabase en el schema `vehiculos_test` (sección 12).
 6. Alta y actualización de precio y disponibilidad, con `X-Api-Key` y registro en el historial.
 7. Fotos: puerto `FotoStorage`, `SupabaseFotoStorage`, `FotoStorageDeshabilitado` y el endpoint de carga.
 8. Docker: Dockerfile y compose.
@@ -596,7 +607,7 @@ El dominio ya está (`Vehiculo`, `Caja`, `PrecioHistorico` y las excepciones). E
 - **Etapa 4 (persistencia):**
   - **[Resuelto en la etapa 4]** `creadoEn` y `actualizadoEn` no están en `Vehiculo`: los fija el adaptador `VehiculoRepositorioJpa` con el `Clock` (alta: ambos; cada `guardar` posterior: conserva `creado_en` y renueva `actualizado_en`).
   - **[Resuelto en la etapa 4]** `aDominio` reconstruye con `Vehiculo.builder(clock)`, informando `id`; el adaptador recibe el `Clock` por constructor. Sigue siendo cierto que un dato guardado con año fuera de rango hace fallar la lectura con `VehiculoInvalidoException`.
-  - **[Resuelto en la etapa 4]** Puerto `VehiculoRepositorio` con su `package-info.java` en `domain.port` y `DominioConfig` con el bean `Clock`: `Clock.tick(Clock.systemUTC(), 1 µs)`, porque `TIMESTAMPTZ` guarda microsegundos y el reloj del sistema da nanosegundos (un instante leído no sería igual al escrito).
+  - **[Resuelto en la etapa 4]** Puerto `VehiculoRepositorio` con su `package-info.java` en `domain.port` y `DominioConfig` con el bean `Clock` (`Clock.systemUTC()`).
 - **Etapa 5 (lectura):** mapear `VehiculoNoEncontradoException` a `VEHICULO_NO_ENCONTRADO` 404 en `ApiExceptionHandler`, con el patrón `responder(CodigoError, detalle, request)`. Hasta entonces daría 500.
 - **Etapa 6 (alta y actualización):**
   - Mapear `VehiculoInvalidoException` a `VALIDACION` 422. Es la segunda barrera: el DTO valida primero.
@@ -622,12 +633,8 @@ Están hechos: `V1__vehiculo.sql`, `VehiculoEntity`, `PrecioHistorialEntity`, su
   - Contenido: datos ficticios variados (marcas, cajas, años, precios, kilometrajes), al menos una unidad con `disponible = false`, fotos en `NULL` y una fila inicial en `precio_historial` por unidad, con el mismo precio que `vehiculo.precio`. Como el SQL no pasa por el `Clock`, `creado_en`, `actualizado_en` y `vigente_desde` van con valores explícitos y coherentes entre sí.
   - Antes de activar el perfil `seed` contra Supabase, avisar al equipo: es la base compartida (regla 4 de `CLAUDE.md`).
 - **Etapas 5 y 6 (servicios):**
-  - El dominio normaliza `precio` a 2 decimales, así que `VehiculoResponse` y `PrecioResponse` serializarían `10000000.00`, mientras los ejemplos de la sección 5.3 muestran `10000000`. Decidirlo en la etapa 5: actualizar los ejemplos o quitar los ceros al serializar (sin pasar el monto a texto: en JSON viaja como número).
-  - Comparar precios con `compareTo`, nunca con `equals`: `10500000` y `10500000.00` son distintos para `equals`. Igual el dominio normaliza a escala 2 en el Builder y en `actualizarPrecio`, así que dos precios del dominio comparan bien.
-  - La transacción de negocio la abre el servicio (`@Transactional`); el adaptador se une a ella. El alta o el `PUT` que cambia el precio llaman a `guardar` y a `registrarPrecio` dentro de la misma transacción. `guardar` y `registrarPrecio` son `MANDATORY`: si el servicio no abre la transacción, fallan con `IllegalTransactionStateException` (500) en vez de commitear por separado. Las lecturas abren la suya de solo lectura si no hay una.
-  - Test de atomicidad en la etapa 6: sin `@Transactional` en el test, forzar que falle la escritura del historial después de `guardar` (por ejemplo con un `VehiculoRepositorio` espía de Mockito o un precio que viole el `CHECK`) y comprobar que la unidad no quedó en la base.
+  - La transacción de negocio la abre el servicio (`@Transactional`); el adaptador se une a ella. El alta o el `PUT` que cambia el precio llaman a `guardar` y a `registrarPrecio` dentro de la misma transacción.
   - `registrarPrecio` no comprueba que el precio coincida con `vehiculo.precio`: mantener "la fila más reciente coincide con el precio actual" es responsabilidad del servicio. Tampoco decide si escribir: el servicio compara el precio nuevo con el actual y no registra nada si solo cambia `disponible` o si el precio es igual.
-  - Los tests de la etapa 6 que hagan alta y `PUT` de precio sobre la misma unidad tienen que avanzar `RelojDePrueba` entre las llamadas: con el mismo instante, `registrarPrecio` rechaza la segunda fila.
   - `guardar` renueva `actualizado_en` en cada llamada, aunque no haya cambios. El servicio no debe llamarlo si no cambió nada.
   - `registrarPrecio` con un `vehiculoId` inexistente lanza `DataIntegrityViolationException` (clave foránea), no `VehiculoNoEncontradoException`: el servicio debe buscar la unidad antes (y ya lo hace para el 404).
   - `buscar(Boolean)` devuelve las unidades de la más nueva a la más vieja (`creado_en DESC`, desempate por `id`); el doc de la API no define otro orden. `historialDePrecios` va del más nuevo al más viejo.
@@ -642,10 +649,6 @@ Decisiones de la etapa 4 que las etapas siguientes deben respetar:
 - Las entidades y los repositorios Spring Data son de visibilidad de paquete: el resto del servicio solo ve el puerto `VehiculoRepositorio`.
 - `PrecioHistorialEntity` referencia al vehículo por `vehiculoId` (sin relación JPA) y no tiene setters: el historial es de solo agregado.
 - `guardar` y `registrarPrecio` usan `saveAndFlush`, para que las violaciones de restricciones salten en la llamada y no al cerrar la transacción.
-- `guardar` y `registrarPrecio` exigen una transacción abierta (`Propagation.MANDATORY`); las lecturas son `readOnly` y no la exigen.
-- `registrarPrecio` consulta la última fila de la unidad (índice `ix_precio_historial_vehiculo`) y rechaza un `vigente_desde` que no sea posterior.
-- El alta hace un solo SELECT antes del INSERT (`VehiculoEntity` implementa `Persistable`). Lo cubre un test con las estadísticas de Hibernate.
-- El `Clock` del contexto tiene resolución de microsegundos (`DominioConfig`), la misma que `TIMESTAMPTZ`.
 
 ---
 
@@ -669,7 +672,7 @@ Está hecho: `db/seed/R__seed_vehiculos.sql`, `application-seed.yml` y `SeedTest
 - **Etapa 9 (punta a punta):** repetir la lista de la etapa 5 sobre el contenedor, partiendo de la base con el seed ya cargado. Chequear también que el WARN `No migrations found` sigue sin aparecer y que `flyway_schema_history` no tiene filas fallidas.
 - **Resueltos al cerrar el seed:** `CLAUDE.md` ya dice `postgres:17-alpine` en la línea de Stack, y las pruebas manuales se hacen con Postman (`CLAUDE.md` y este documento lo dicen en todos lados; si aparece "Insomnia" en algún lugar nuevo, corregirlo).
 - **Si se edita el seed:** Flyway lo vuelve a ejecutar (cambia el checksum), pero `ON CONFLICT DO NOTHING` no actualiza filas existentes. Para corregir un dato ya cargado: borrar las filas por id (primero `precio_historial`, después `vehiculo`) y volver a correr con `seed`. Nunca editar la `V1` por esto.
-- **Si se agrega una `V2` que cambie las tablas o las columnas de `vehiculo` / `precio_historial`:** revisar que el `R__` siga siendo válido. Una columna nueva `NOT NULL` sin `DEFAULT` lo rompería. Revisarlo antes de mergear la `V2`, y correr `SeedTest`. Actualizar también las expectativas de `MigracionesTest` (`lasColumnasDe...CoincidenConLaV1`) en el mismo cambio.
+- **Si se agrega una `V2` que cambie las tablas o las columnas de `vehiculo` / `precio_historial`:** revisar que el `R__` siga siendo válido. Una columna nueva `NOT NULL` sin `DEFAULT` lo rompería. Revisarlo antes de mergear la `V2`, y correr `SeedTest`.
 - **Para limpiar el seed:** los ids son fijos (`a0000000-0000-4000-8000-0000000000NN` y `b0000000-...`), así que se puede borrar solo lo sembrado sin tocar datos reales. Primero el historial de las unidades sembradas (incluidas las filas que haya agregado la API, que no tienen el prefijo `b0000000`): `DELETE FROM vehiculos.precio_historial WHERE vehiculo_id::text LIKE 'a0000000-%'`. Después `DELETE FROM vehiculos.vehiculo WHERE id::text LIKE 'a0000000-%'`. Otras filas de historial con prefijo `b0000000` no deberían existir.
 
 Decisiones del seed que las etapas siguientes deben respetar:
@@ -677,18 +680,6 @@ Decisiones del seed que las etapas siguientes deben respetar:
 - El seed es una migración repetible en `db/seed`, nunca una `V`. Un cambio de esquema sigue siendo una `V2` en `db/migration`.
 - `db/seed` no se carga fuera del perfil `seed`: los tests de repositorio y de migraciones esperan la base vacía.
 - El script no califica el schema: depende de que Flyway fije el `search_path` (`flyway.schemas: vehiculos`). Para ejecutarlo a mano hay que hacer antes `SET search_path TO vehiculos`.
-
-### Pendientes que dejó la etapa 5 (lectura)
-
-Está hecho: `ConsultaVehiculoService`, los DTOs `VehiculoResponse`, `PrecioResponse` y `PrecioHistoricoResponse`, `VehiculoController` con los 4 `GET` documentados en `/v3/api-docs`, el mapeo de `VehiculoNoEncontradoException` a `VEHICULO_NO_ENCONTRADO` 404 y los tests (`ConsultaVehiculoServiceTest`, `VehiculoControllerTest`, `VehiculoApiSeedTest`, `ArranqueSinSeedTest`). Se probó contra Supabase con el seed cargado. Lo que quedó, agrupado por etapa:
-
-- **Etapa 6 (alta y actualización):**
-  - **Dato guardado inválido:** antes de mapear `VehiculoInvalidoException` a `VALIDACION` 422, hacer que `VehiculoRepositorioJpa.aDominio` la atrape y la relance como `IllegalStateException("Dato guardado inválido para el vehículo " + id, causa)`, para que un dato corrupto en la base siga dando 500 `ERROR_INTERNO` en los `GET` y el 422 quede solo para datos de entrada. `VehiculoApiSeedTest#datoGuardadoFueraDeLasInvariantesResponde500SinDetalle` (inserta `anio = 1900` y pasa por el adaptador real) tiene que seguir pasando sin cambios; `VehiculoControllerTest#datoGuardadoInvalidoResponde500SinDetalle` hace que el mock lance `VehiculoInvalidoException` y hay que cambiarlo para que lance la excepción nueva.
-  - Hoy una sola fila fuera de las invariantes hace que todo `GET /vehiculos` responda 500, no solo el detalle de esa unidad. Decidir si se acepta o si el listado debe tolerarlo.
-  - **Precio en el dominio:** `CLAUDE.md` dice que `Vehiculo.builder().build()` normaliza el precio a escala 2 y limita la parte entera a 12 dígitos, pero `Vehiculo.validarPrecio` solo exige que sea mayor que 0. Sin eso, un `POST` o `PUT` con `100.125` se guarda redondeado por PostgreSQL (`NUMERIC(14,2)`) sin aviso, y uno con 13 dígitos enteros da 500 por desborde de la columna en vez de 422. Las lecturas no se ven afectadas: la API ya responde siempre con 2 decimales (`Precios.aEscala2` en `api.dto`, que no redondea).
-  - El `detail` del 400 `SOLICITUD_INVALIDA` por un id de ruta que no es UUID (o un `disponible` que no es booleano) sale en inglés, generado por Spring: `Failed to convert 'id' with value: 'no-es-un-uuid'`. Si se quiere en español, traducirlo en `ApiExceptionHandler` (`handleTypeMismatch`).
-- **Documento:** los ejemplos de la sección 5.3 muestran el precio como `10000000`; la API responde con 2 decimales (`10000000.00`, decisión de la etapa 5). Para un parser JSON es el mismo número, pero conviene alinear los ejemplos.
-- **Si se edita el seed:** `VehiculoApiSeedTest` depende de sus números (10 unidades, 8 disponibles, 2 no disponibles: Sandero y Civic; Citroën C3 primero y Corolla último). Actualizarlo junto con `R__seed_vehiculos.sql`.
 
 ---
 
@@ -729,6 +720,7 @@ Dependencias Maven de `vehiculos-service`: `spring-boot-starter-web`, `spring-bo
 | DV-12 | Sin atributo `tipo` de vehículo | Agregarlo porque lo pidió otro servicio | Cada servicio define su propio modelo |
 | DV-13 | Sin módulo `contracts` compartido | Copiarlo del servicio `clientes` | Hoy solo tiene enums de otros servicios y `vehiculos` no consume eventos |
 | DV-14 | Sin OpenSpec. Se trabaja con `CLAUDE.md`, este archivo y pruebas manuales con Postman | Desarrollo guiado por especificaciones | Decisión del responsable |
+| DV-15 | Los tests de integración corren por defecto en Testcontainers y, de forma opcional (`-Psupabase`), contra Supabase en el schema `vehiculos_test` | Solo Testcontainers; tests contra el schema `vehiculos` | La base real es Supabase y conviene validar contra ella, pero sin ensuciar los datos compartidos y sin exigir credenciales a quien solo quiere correr `verify` |
 
 ### Pendientes que no bloquean
 
