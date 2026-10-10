@@ -23,6 +23,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.uade.crm.vehiculos.PruebaWebMvc;
 import com.uade.crm.vehiculos.RelojDePrueba;
+import com.uade.crm.vehiculos.application.ActualizacionVehiculoService;
+import com.uade.crm.vehiculos.application.AltaVehiculoService;
 import com.uade.crm.vehiculos.application.ConsultaVehiculoService;
 import com.uade.crm.vehiculos.domain.model.Caja;
 import com.uade.crm.vehiculos.domain.model.PrecioHistorico;
@@ -42,6 +44,12 @@ class VehiculoControllerTest {
 
     @MockitoBean
     private ConsultaVehiculoService consulta;
+
+    @MockitoBean
+    private AltaVehiculoService alta;
+
+    @MockitoBean
+    private ActualizacionVehiculoService actualizacion;
 
     @Test
     void listarSinFiltroDevuelveTodasLasUnidades() throws Exception {

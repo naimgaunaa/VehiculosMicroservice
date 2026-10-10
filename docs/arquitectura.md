@@ -703,6 +703,39 @@ Decisiones de la etapa 5.1 que las etapas siguientes deben respetar:
 
 ---
 
+### Pendientes que dejó la etapa 6 (alta y actualización)
+
+Está hecho: `@RequiereClaveServicio`, `ClaveServicioInterceptor` y `ClaveServicioInvalidaException` en `api.seguridad`, `WebConfig`, `AltaVehiculoRequest`, `ActualizacionVehiculoRequest`, `AltaVehiculoService`, `ActualizacionVehiculoService`, el comando `AltaVehiculo`, `DatosInvalidosException`, `POST /vehiculos` y `PUT /vehiculos/{id}`. `verify` pasa en Testcontainers (283 tests, ~19 s) y con `-Psupabase` (283 tests, 52 s). Se probó con `curl` contra Supabase el 2026-10-10 (casos 4 a 9 y 12 de la sección 12, más historial con unidades sembradas). Lo que quedó:
+
+- **Etapa 7 (fotos):**
+  - **Verificar el orden multipart/401.** `DispatcherServlet` resuelve el multipart (`checkMultipart`) antes de buscar el handler y de correr los interceptores. En `PUT /vehiculos/{id}/foto` el archivo se leería antes de decidir el 401, y un archivo que supere el límite de Spring daría error antes que el 401. Probarlo y decidir (por ejemplo, multipart con resolución diferida) antes de cerrar la etapa.
+  - El endpoint de foto lleva `@RequiereClaveServicio` y `@SecurityRequirement(name = OpenApiConfig.ESQUEMA_CLAVE_SERVICIO)`, como el `POST` y el `PUT`.
+  - `spring.jackson.deserialization.fail-on-unknown-properties: true` es global: si `SupabaseFotoStorage` deserializa respuestas de Storage con el `ObjectMapper` de Spring (por ejemplo, vía `RestClient.Builder`), esos records necesitan `@JsonIgnoreProperties(ignoreUnknown = true)` o fallan con cualquier campo nuevo de Supabase.
+  - Una URL vacía en `Vehiculo.asignarFoto` es un error del servidor (la URL la arma el storage), no de la entrada: no convertir esa `VehiculoInvalidoException` en `DatosInvalidosException`. Debe seguir dando 500.
+  - `FotoVehiculoService` busca la unidad antes (404) y, como el `PUT`, abre la transacción y llama a `guardar` una sola vez.
+- **Documentación (§3.3, §5.3, §6, §12):**
+  - §3.3 y §5.3: un campo desconocido en el cuerpo da `422 VALIDACION` con `errores: [{campo: "<nombre>", mensaje: "campo no admitido"}]`, tanto en el `POST` como en el `PUT` (el flag de Jackson es global). Un `JSON_INVALIDO` 400 queda solo para cuerpos que no se pueden leer.
+  - §5.3: el `PUT` sin `precio` ni `disponible` (`{}`, o ambos en `null`) responde `errores: [{campo: "precioODisponible", mensaje: "hay que informar precio, disponible o ambos"}]`.
+  - §3.3: el 422 que nace en el dominio (`DatosInvalidosException`) sale con el mensaje en `detail` y **sin** `errores`, porque `VehiculoInvalidoException` no sabe qué campo falló. Se aparta de la regla 1 de `CLAUDE.md`, pero hoy no se alcanza: el DTO cubre todas las reglas del Builder. Mejora anotada en `docs/mejoras.md`.
+  - §6: dice que `creado_en` y `actualizado_en` las fija el servicio; las fija el adaptador (etapa 4). El servicio toma `vigente_desde` con `clock.instant()` antes de `guardar`, así que en producción `vigente_desde` queda unos microsegundos antes que `actualizado_en` (con `RelojDePrueba` son iguales). La regla que importa, "la fila más reciente coincide con `vehiculo.precio`", se cumple porque todo va en la misma transacción.
+  - §12: sumar a Postman el caso "`PUT` con un campo no admitido → 422" y "`POST` con `anio` 2028 → 422".
+- **Año máximo:** el DTO valida `@Max(2027)` fijo (decisión del 2026-10-10: el TP se presenta en 2026) y el Builder valida "año actual + 1". Durante 2026 coinciden; desde el 1/1/2027 el DTO rechazaría 2028 aunque el dominio lo acepte, y si se cambia el DTO sin el dominio el 422 saldría sin `errores` (ver arriba).
+- **Etapa 9 (punta a punta):**
+  - Repetir los casos 4 a 9 y 12 sobre el contenedor.
+  - La prueba de la etapa 6 dejó datos en `vehiculos`: la unidad `93a56a83-07fd-452e-be77-378d31d4e948` (marca "Ficticia", con 1 fila de historial) y el Corolla sembrado `a0000000-0000-4000-8000-000000000001` con precio 23900000.00 y una segunda fila de historial (`disponible` quedó en `true`). Para limpiar: `DELETE FROM vehiculos.precio_historial WHERE vehiculo_id = '93a56a83-07fd-452e-be77-378d31d4e948'`, `DELETE FROM vehiculos.vehiculo WHERE id = '93a56a83-07fd-452e-be77-378d31d4e948'`; y para el Corolla, `DELETE FROM vehiculos.precio_historial WHERE vehiculo_id = 'a0000000-0000-4000-8000-000000000001' AND id::text NOT LIKE 'b0000000-%'` y `UPDATE vehiculos.vehiculo SET precio = 24500000.00 WHERE id = 'a0000000-0000-4000-8000-000000000001'`. Con eso los números de la etapa 5 (10, 8, 2) vuelven a valer.
+- **Etapa 5.1:** la duración de `-Psupabase` bajó a 52 s (cada `clean` tarda menos de 1 s). La nota de "~3 min 40 s" y la mejora de duración de `docs/mejoras.md` quedan desactualizadas.
+- **Concurrencia:** dos `PUT` que cambian el precio de la misma unidad en el mismo microsegundo hacen fallar `registrarPrecio` (`vigente_desde` debe ser posterior a la última fila) y responden 500. Es coherente con "el último `PUT` gana" y no hay control optimista; no se corrige.
+
+Decisiones de la etapa 6 que las etapas siguientes deben respetar:
+
+- `VehiculoInvalidoException` no se mapea de forma global: da 500 (dato guardado inválido). Cada servicio de escritura envuelve solo las llamadas que procesan la entrada del cliente (`build()`, `actualizarPrecio`) y las convierte en `DatosInvalidosException`, que da `422 VALIDACION`. Nunca envolver `buscarPorId`.
+- El interceptor actúa solo sobre handlers con `@RequiereClaveServicio`; las lecturas quedan abiertas. Un 401 no distingue entre header ausente y clave incorrecta, y nunca repite el valor recibido ni el configurado.
+- Un `PUT` que no cambia nada no llama a `guardar` (no renueva `actualizado_en`). El historial solo se escribe si el precio cambió según `compareTo`.
+- La comparación del precio se hace después de aplicar `actualizarPrecio`, sobre el precio normalizado por el dominio: la regla del precio no se reimplementa en el servicio.
+- Los tests de escritura que necesitan confirmar (como `AtomicidadActualizacionTest`) insertan con JDBC ids fijos `c0000000-…` y los borran en `@AfterEach`; el resto va con `@Transactional`.
+
+---
+
 ## 14. Tecnologías y dependencias
 
 | Componente | Tecnología |
