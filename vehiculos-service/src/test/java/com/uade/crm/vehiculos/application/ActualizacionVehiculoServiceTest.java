@@ -48,7 +48,7 @@ class ActualizacionVehiculoServiceTest {
 
     @Test
     void unaUnidadInexistenteLanzaNoEncontradoSinGuardar() {
-        when(repositorio.buscarPorId(ID)).thenReturn(Optional.empty());
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.actualizar(ID, new BigDecimal("10500000"), null))
                 .isInstanceOf(VehiculoNoEncontradoException.class);
@@ -58,7 +58,7 @@ class ActualizacionVehiculoServiceTest {
 
     @Test
     void unPrecioDistintoGuardaYRegistraElPrecioNuevo() {
-        when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(vehiculo("10000000.00", true)));
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenReturn(Optional.of(vehiculo("10000000.00", true)));
         when(repositorio.guardar(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
 
         Vehiculo actualizado = servicio.actualizar(ID, new BigDecimal("10500000"), null);
@@ -73,7 +73,7 @@ class ActualizacionVehiculoServiceTest {
 
     @Test
     void elPrecioQueSeRegistraEsElQueQuedoGuardado() {
-        when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(vehiculo("10000000.00", true)));
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenReturn(Optional.of(vehiculo("10000000.00", true)));
         when(repositorio.guardar(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
 
         servicio.actualizar(ID, new BigDecimal("10500000.5"), null);
@@ -85,7 +85,7 @@ class ActualizacionVehiculoServiceTest {
 
     @Test
     void soloDisponibleGuardaSinRegistrarPrecio() {
-        when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(vehiculo("10000000.00", true)));
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenReturn(Optional.of(vehiculo("10000000.00", true)));
         when(repositorio.guardar(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
 
         Vehiculo actualizado = servicio.actualizar(ID, null, false);
@@ -99,7 +99,7 @@ class ActualizacionVehiculoServiceTest {
     @ValueSource(strings = {"10500000", "10500000.0", "10500000.00", "10500000.000"})
     void elMismoPrecioConOtraEscalaNoGuardaNiRegistra(String precio) {
         Vehiculo actual = vehiculo("10500000.00", true);
-        when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(actual));
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenReturn(Optional.of(actual));
 
         Vehiculo resultado = servicio.actualizar(ID, new BigDecimal(precio), null);
 
@@ -110,7 +110,7 @@ class ActualizacionVehiculoServiceTest {
 
     @Test
     void laMismaDisponibilidadNoGuarda() {
-        when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(vehiculo("10500000.00", false)));
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenReturn(Optional.of(vehiculo("10500000.00", false)));
 
         servicio.actualizar(ID, null, false);
 
@@ -120,7 +120,7 @@ class ActualizacionVehiculoServiceTest {
 
     @Test
     void elMismoPrecioYOtraDisponibilidadGuardaSinRegistrarPrecio() {
-        when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(vehiculo("10500000.00", true)));
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenReturn(Optional.of(vehiculo("10500000.00", true)));
         when(repositorio.guardar(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
 
         servicio.actualizar(ID, new BigDecimal("10500000"), false);
@@ -131,7 +131,7 @@ class ActualizacionVehiculoServiceTest {
 
     @Test
     void otroPrecioYOtraDisponibilidadGuardaUnaVezYRegistraElPrecio() {
-        when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(vehiculo("10000000.00", true)));
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenReturn(Optional.of(vehiculo("10000000.00", true)));
         when(repositorio.guardar(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
 
         servicio.actualizar(ID, new BigDecimal("9000000"), false);
@@ -142,7 +142,7 @@ class ActualizacionVehiculoServiceTest {
 
     @Test
     void unPrecioQueElDominioRechazaLanzaDatosInvalidosSinGuardar() {
-        when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(vehiculo("10000000.00", true)));
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenReturn(Optional.of(vehiculo("10000000.00", true)));
 
         assertThatThrownBy(() -> servicio.actualizar(ID, new BigDecimal("100.001"), null))
                 .isInstanceOf(DatosInvalidosException.class)
@@ -154,7 +154,7 @@ class ActualizacionVehiculoServiceTest {
 
     @Test
     void unDatoGuardadoInvalidoNoSeConvierteEnDatosInvalidos() {
-        when(repositorio.buscarPorId(ID)).thenThrow(new VehiculoInvalidoException("El año debe estar entre 1950 y 2027"));
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenThrow(new VehiculoInvalidoException("El año debe estar entre 1950 y 2027"));
 
         assertThatThrownBy(() -> servicio.actualizar(ID, new BigDecimal("10500000"), null))
                 .isExactlyInstanceOf(VehiculoInvalidoException.class);

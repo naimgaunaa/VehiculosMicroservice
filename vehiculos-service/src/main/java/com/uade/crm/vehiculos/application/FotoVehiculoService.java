@@ -43,7 +43,8 @@ public class FotoVehiculoService {
     }
 
     private Asignacion asignarYGuardar(UUID id, String url) {
-        Vehiculo vehiculo = buscar(id);
+        Vehiculo vehiculo = repositorio.buscarPorIdParaActualizar(id)
+                .orElseThrow(() -> new VehiculoNoEncontradoException(id));
         Optional<String> anterior = vehiculo.fotoUrl();
         vehiculo.asignarFoto(url);
         return new Asignacion(repositorio.guardar(vehiculo), anterior);

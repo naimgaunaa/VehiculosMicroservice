@@ -59,6 +59,12 @@ class VehiculoRepositorioJpa implements VehiculoRepositorio {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<Vehiculo> buscarPorIdParaActualizar(UUID id) {
+        return vehiculos.findParaActualizarById(id).map(entidad -> aDominio(entidad, clock));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
     public Vehiculo guardar(Vehiculo vehiculo) {
         Instant ahora = clock.instant();
         VehiculoEntity entidad = vehiculos.findById(vehiculo.id()).orElseGet(() -> VehiculoEntity.nueva(ahora));

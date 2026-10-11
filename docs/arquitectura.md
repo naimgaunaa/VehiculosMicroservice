@@ -76,10 +76,11 @@ com.uade.crm.vehiculos
 ├── api
 │   ├── VehiculoController
 │   ├── dto            AltaVehiculoRequest, ActualizacionVehiculoRequest, VehiculoResponse, PrecioResponse,
-│   │                  PrecioHistoricoResponse
+│   │                  PrecioHistoricoResponse, Precios (escala 2 en las respuestas)
 │   ├── error          ApiExceptionHandler (@RestControllerAdvice), CodigoError
 │   └── seguridad      ClaveServicioInterceptor, RequiereClaveServicio, ClaveServicioInvalidaException
-├── application        ConsultaVehiculoService, AltaVehiculoService, ActualizacionVehiculoService, FotoVehiculoService
+├── application        ConsultaVehiculoService, AltaVehiculoService, ActualizacionVehiculoService, FotoVehiculoService,
+│                      AltaVehiculo (comando del alta), DatosInvalidosException
 ├── domain
 │   ├── model          Vehiculo (con Builder), Caja, PrecioHistorico, ArchivoFoto, TipoFoto, VehiculoInvalidoException,
 │   │                  VehiculoNoEncontradoException, FotoInvalidaException, AlmacenamientoNoDisponibleException
@@ -88,7 +89,8 @@ com.uade.crm.vehiculos
 │   ├── persistence    VehiculoEntity, VehiculoJpaRepository, VehiculoRepositorioJpa,
 │   │                  PrecioHistorialEntity, PrecioHistorialJpaRepository
 │   └── storage        SupabaseFotoStorage, FotoStorageDeshabilitado, FotoStorageConfig
-└── config             VehiculosProperties, CorrelationIdFilter, DominioConfig, OpenApiConfig, WebConfig
+└── config             VehiculosProperties (con el enum ModoFotos), CorrelationIdFilter, DominioConfig, OpenApiConfig,
+                       WebConfig
 ```
 
 Cada paquete lleva su `package-info.java`. El mapeo entre dominio, entidad y DTO es manual.
@@ -116,7 +118,7 @@ El servicio `clientes` ya está implementado por otro integrante y fija el estil
 
 ### 3.2 Trazabilidad
 
-`CorrelationIdFilter` toma `X-Correlation-Id` del request o genera un UUID, lo deja en el MDC con la clave `correlationId`, lo devuelve en la respuesta y lo escribe en cada línea de log con el patrón `[%X{correlationId:-}]`.
+`CorrelationIdFilter` toma `X-Correlation-Id` del request o genera un UUID, lo deja en el MDC con la clave `correlationId`, lo devuelve en la respuesta y lo escribe en cada línea de log con el patrón `[%X{correlationId:-}]`. Un `X-Correlation-Id` que no cumpla `[A-Za-z0-9._-]{1,64}` se descarta y se genera uno nuevo, para que el cliente no pueda inyectar líneas en los logs.
 
 ### 3.3 Errores
 
@@ -139,7 +141,7 @@ Todo error responde `application/problem+json` (`ProblemDetail`), con `codigo` e
 
 | `codigo` | HTTP | Cuándo |
 |---|---|---|
-| `VALIDACION` | 422 | Falla de Bean Validation, un valor que no se puede convertir al tipo del campo (por ejemplo un enum fuera de rango) o un campo no admitido en el cuerpo (`mensaje`: `campo no admitido`, en el `POST` y en el `PUT`). Incluye `errores` con `campo` y `mensaje`. Excepción: el 422 que nace en el dominio (`DatosInvalidosException`) lleva el mensaje en `detail` y no trae `errores`, porque `VehiculoInvalidoException` no sabe qué campo falló; hoy no se alcanza porque el DTO cubre todas las reglas del Builder |
+| `VALIDACION` | 422 | Falla de Bean Validation, un valor que no se puede convertir al tipo del campo (por ejemplo un enum fuera de rango, un número con decimales en un campo entero o un texto en un campo numérico o booleano: `accept-float-as-int` y `allow-coercion-of-scalars` están en `false`) o un campo no admitido en el cuerpo (`mensaje`: `campo no admitido`, en el `POST` y en el `PUT`). Incluye `errores` con `campo` y `mensaje`. Excepción: el 422 que nace en el dominio (`DatosInvalidosException`) lleva el mensaje en `detail` y no trae `errores`, porque `VehiculoInvalidoException` no sabe qué campo falló; hoy no se alcanza porque el DTO cubre todas las reglas del Builder |
 | `JSON_INVALIDO` | 400 | Cuerpo que no se puede leer: JSON mal formado o ausente |
 | `SOLICITUD_INVALIDA` | 400 (o el 4xx que resuelve Spring) | Error 4xx que resuelve Spring MVC. Conserva su status real: 405 método no permitido, 404 ruta inexistente, 415 tipo de contenido no soportado. Un id de ruta que no es UUID da 400 |
 | `CLAVE_SERVICIO_INVALIDA` | 401 | Falta `X-Api-Key` o no coincide. Se evalúa antes de validar el cuerpo |
@@ -197,7 +199,7 @@ El historial guarda, por cada vehículo, una fila por cada precio que rigió (`p
 | GET | `/vehiculos/{id}/historial-precios` | `200` con la lista del más nuevo al más viejo, `404` | Historial de precios |
 | POST | `/vehiculos` | `201` con el vehículo y `Location`, `422` | Alta |
 | PUT | `/vehiculos/{id}` | `200` con el vehículo, `404`, `422` | Cambia `precio` y/o `disponible`. Si cambia el precio, registra una fila en el historial |
-| PUT | `/vehiculos/{id}/foto` | `200` con el vehículo, `400` sin el campo `archivo`, `404`, `415` si no es multipart, `422` `FOTO_INVALIDA`, `503` `ALMACENAMIENTO_NO_DISPONIBLE` | Carga o reemplaza la foto (`multipart/form-data`, campo `archivo`) |
+| PUT | `/vehiculos/{id}/foto` | `200` con el vehículo, `400` sin el campo `archivo` o con un multipart mal formado, `404`, `415` si no es multipart, `422` `FOTO_INVALIDA`, `503` `ALMACENAMIENTO_NO_DISPONIBLE` | Carga o reemplaza la foto (`multipart/form-data`, campo `archivo`) |
 
 El `PUT /vehiculos/{id}` modifica solo algunos campos, así que su semántica es la de un `PATCH`. Se mantiene `PUT` porque así lo espera el contrato del equipo.
 
@@ -228,7 +230,7 @@ Actualización (`PUT /vehiculos/{id}`): ambos campos son opcionales, pero al men
 { "precio": 10500000, "disponible": false }
 ```
 
-Respuesta de `GET /vehiculos/{id}` (datos ficticios; `<ref>` es el project-ref de Supabase):
+Las respuestas devuelven el precio siempre con dos decimales (`Precios.aEscala2`). Respuesta de `GET /vehiculos/{id}` (datos ficticios; `<ref>` es el project-ref de Supabase):
 
 ```json
 {
@@ -238,7 +240,7 @@ Respuesta de `GET /vehiculos/{id}` (datos ficticios; `<ref>` es el project-ref d
   "version": "XEI CVT",
   "anio": 2021,
   "kilometraje": 45000,
-  "precio": 10000000,
+  "precio": 10000000.00,
   "disponible": true,
   "caja": "AUTOMATICA",
   "fotoUrl": "https://<ref>.supabase.co/storage/v1/object/public/vehiculos-fotos/9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b.jpg"
@@ -248,15 +250,15 @@ Respuesta de `GET /vehiculos/{id}` (datos ficticios; `<ref>` es el project-ref d
 Respuesta de `GET /vehiculos/{id}/precio`:
 
 ```json
-{ "precio": 10000000, "disponible": true }
+{ "precio": 10000000.00, "disponible": true }
 ```
 
 Respuesta de `GET /vehiculos/{id}/historial-precios`:
 
 ```json
 [
-  { "precio": 10500000, "vigenteDesde": "2026-10-07T18:20:00Z" },
-  { "precio": 10000000, "vigenteDesde": "2026-09-22T14:03:11Z" }
+  { "precio": 10500000.00, "vigenteDesde": "2026-10-07T18:20:00Z" },
+  { "precio": 10000000.00, "vigenteDesde": "2026-09-22T14:03:11Z" }
 ]
 ```
 
@@ -271,7 +273,7 @@ Respuesta de `GET /vehiculos/{id}/historial-precios`:
 - **Rendimiento:** `/precio` está en el camino de cada calificación. Es una consulta por clave primaria, sin joins ni caché.
 - **Historial de precios:** `precio_historial` guarda una fila por cada precio que rigió, con `vigente_desde`. Se escribe en la misma transacción que el alta (precio inicial) y que cada `PUT` que cambia el precio. Un `PUT` que solo cambia `disponible`, o que envía el mismo precio, no escribe nada. Es de solo agregado y su fila más reciente coincide siempre con `vehiculo.precio`.
 - **Fechas:** `creado_en` y `actualizado_en` son `TIMESTAMPTZ` mapeadas como `Instant`, y las fija el adaptador `VehiculoRepositorioJpa` con el `Clock`: en el alta, ambas; en cada `guardar` posterior, conserva `creado_en` y renueva `actualizado_en`. No viajan en la API. `vigente_desde` lo toma el servicio con `clock.instant()` antes de `guardar`, así que en producción queda unos microsegundos antes que `actualizado_en`. La fila más reciente del historial coincide igual con `vehiculo.precio` porque todo va en la misma transacción.
-- **Sin control de concurrencia optimista:** el último `PUT` gana. Alcanza porque las actualizaciones de precio son raras y las hace una persona.
+- **Sin control de concurrencia optimista:** el último `PUT` gana. Alcanza porque las actualizaciones de precio son raras y las hace una persona. Las escrituras (`PUT` y la transacción de la foto) leen la unidad con bloqueo de fila (`buscarPorIdParaActualizar`, `SELECT … FOR UPDATE`): una escritura concurrente espera a que la otra confirme y lee lo que dejó, así un `PUT` que solo cambia `disponible` no revierte el precio que confirmó otro. `CarreraDePutsTest` lo cubre.
 
 ---
 
@@ -292,7 +294,7 @@ La foto vive en Storage y la base guarda solo el texto de `fotoUrl`. Son dos con
 - **Errores de Storage:** cualquier error del `RestClient` (4xx, 5xx o timeout) termina en `AlmacenamientoNoDisponibleException`. Se loguea la operación, el objeto, el status y el cuerpo de la respuesta, nunca los headers (`apikey`). Un objeto inexistente responde HTTP 400 con `"statusCode":"404"` y `NoSuchKey` en el cuerpo.
 - **Caché de la CDN:** Cloudflare puede seguir sirviendo un objeto ya borrado o reemplazado (`cf-cache-status: HIT`). Un borrado se verifica listando el bucket (`POST /storage/v1/object/list/{bucket}`) o pidiendo la URL con `?v=...`.
 
-Flujo de `PUT /vehiculos/{id}/foto`: el interceptor exige `X-Api-Key` (401); `FotoVehiculoService` busca el vehículo (404 si no existe), valida el archivo con `ArchivoFoto.de(...)` (422) y sube a Storage (503 si falla), todo sin transacción abierta: la llamada HTTP no retiene una conexión de la base. Después abre una transacción corta (`TransactionOperations`) que vuelve a leer la unidad, le asigna la URL pública y llama a `guardar` una sola vez (actualiza `foto_url` y `actualizado_en`). Releer evita pisar un cambio de precio hecho por otro `PUT` durante la subida. Por último, si cambió la extensión, borra el objeto viejo. El orden de errores es 401 → 404 → 422 → 503, también en modo `deshabilitado`: el servicio no conoce el modo.
+Flujo de `PUT /vehiculos/{id}/foto`: el interceptor exige `X-Api-Key` (401); `FotoVehiculoService` busca el vehículo (404 si no existe), valida el archivo con `ArchivoFoto.de(...)` (422) y sube a Storage (503 si falla), todo sin transacción abierta: la llamada HTTP no retiene una conexión de la base. Después abre una transacción corta (`TransactionOperations`) que vuelve a leer la unidad con bloqueo de fila (`buscarPorIdParaActualizar`), le asigna la URL pública y llama a `guardar` una sola vez (actualiza `foto_url` y `actualizado_en`). Releer con bloqueo evita pisar un cambio de precio hecho por otro `PUT` durante la subida o en paralelo con la transacción. Por último, si cambió la extensión, borra el objeto viejo. El orden de errores es 401 → 415/400 → 404 → 422 → 503, también en modo `deshabilitado`: el servicio no conoce el modo. El cuerpo multipart se lee al resolver el argumento, antes de buscar la unidad: 415 si no es multipart, 400 si está mal formado o falta `archivo`.
 
 **Strategy `FotoStorage`.** Interfaz del dominio (`guardar(UUID, ArchivoFoto)` devuelve la URL pública; `eliminar(String fotoUrl)` ignora una URL que no sea de su proyecto y bucket) con dos implementaciones de visibilidad de paquete. Las elige `FotoStorageConfig` con un `switch` sobre `VehiculosProperties.modoFotos()` (variable `VEHICULOS_FOTOS_MODO`, sin distinguir mayúsculas); no se usa `@ConditionalOnProperty(havingValue = ...)`, que sí las distingue:
 
@@ -349,6 +351,7 @@ classDiagram
         <<interface>>
         +buscar(Boolean) List
         +buscarPorId(UUID) Optional
+        +buscarPorIdParaActualizar(UUID) Optional
         +guardar(Vehiculo) Vehiculo
         +registrarPrecio(UUID, BigDecimal, Instant) void
         +historialDePrecios(UUID) List
@@ -452,6 +455,7 @@ La carga inicial vive en `vehiculos-service/src/main/resources/db/seed/R__seed_v
 - **Contenido.** 10 unidades ficticias: Toyota Corolla, Ford Fiesta, Volkswagen Amarok, Chevrolet Onix, Renault Sandero, Peugeot 208, Fiat Cronos, Honda Civic, Nissan Kicks y Citroën C3. Años 2009 a 2025, kilometrajes de 8.000 a 178.000, precios de 7,2 a 52 millones, ambas cajas, `version` presente en algunas y ausente en otras. Dos unidades con `disponible = false` (Sandero y Civic). Todas con `foto_url` en `NULL`.
 - **Historial.** Cada unidad tiene su fila inicial en `precio_historial`, con el mismo precio que `vehiculo.precio` y `vigente_desde` igual a `creado_en`. Como el SQL no pasa por el `Clock`, las fechas son explícitas (septiembre de 2026, una por día, para que el orden `creado_en DESC` del listado sea estable).
 - **Pruebas.** `SeedTest`, `ArranqueSinSeedTest` y `VehiculoApiSeedTest` comparten un contexto con `@PruebaIntegracionSeed` (`@PruebaIntegracion` + `@ActiveProfiles({"test", "seed"})` + `@Tag("seed")`). `SeedTest` comprueba las 10 filas, la variedad, las fotos en `NULL`, el historial y la idempotencia. Ninguna otra clase activa el perfil, así que los demás tests siguen viendo la base vacía.
+- **Arranque sin `seed` sobre una base sembrada.** La repetible queda en `flyway_schema_history` y, sin el perfil, Flyway no la encuentra y falla al validar. `application.yml` fija `spring.flyway.ignore-migration-patterns: "*:future,repeatable:missing"` para ignorar solo ese caso (una `V` aplicada que falta sigue fallando; `*:future` es el valor por defecto de Flyway y se repite porque la lista lo reemplaza). `ArranqueSinSeedTest` lo cubre.
 - **Base compartida.** Antes de activar `seed` contra Supabase hay que avisar al equipo (regla 4 de `CLAUDE.md`).
 
 ---
@@ -483,6 +487,8 @@ spring:
     schemas: vehiculos
 ```
 
+Flyway valida con `ignore-migration-patterns: "*:future,repeatable:missing"` para que `local` y `docker` arranquen sin `seed` sobre la base ya sembrada (ver 9.3).
+
 Spring Boot no lee archivos `.env` por sí solo. Para correr en local se cargan las variables de `infra/.env` en la sesión de la terminal con un script (`scripts/cargar-env.ps1` en Windows, `scripts/cargar-env.sh` en Linux y macOS). El script se corre antes de `spring-boot:run`.
 
 ---
@@ -513,7 +519,7 @@ Un solo modo: el servicio corre en un contenedor y se conecta a Supabase con las
 - Repositorio y migraciones contra PostgreSQL real con Testcontainers (`PostgresDePrueba` con `@ServiceConnection` y la anotación `@PruebaIntegracion`), incluido el filtro `disponible`. `@PruebaIntegracion` levanta el servidor en un puerto aleatorio (`RANDOM_PORT`) e importa `RelojDePrueba` y `FotoStorageEnMemoria` (`@Primary`, con `reiniciar()`). Las consultas nativas toman el schema de `spring.jpa.properties.hibernate.default_schema` (`@Value`), para correr igual en `vehiculos` y en `vehiculos_test`. El seed se cubre con `@PruebaIntegracionSeed` (sección 9.3). La suite tiene 6 contextos: 2 con base y 4 `@WebMvcTest`.
 - Controllers con MockMvc (`PruebaWebMvc`): códigos de estado, forma del `ProblemDetail` (`codigo`, `correlationId`, `errores`), `X-Api-Key` faltante o inválida (401 antes de validar el cuerpo) y `caja` fuera del enum (422 con los valores aceptados).
 - Fotos: `ArchivoFotoTest` (firmas, vacío, límite de 2 MiB); `FotoVehiculoServiceTest` con `FotoStorageEnMemoria` (tipo inválido, PDF renombrado, tamaño excedido, reemplazo con otra extensión, falla del almacenamiento, modo deshabilitado y orden de errores); `SupabaseFotoStorageTest` con `MockRestServiceServer` (URL, método, `apikey`, `x-upsert`, cuerpo, y 4xx, 5xx y timeout); `FotoApiTest` con el servidor real, porque MockMvc no aplica los límites multipart (1,5 MB pasa, 2,5 MB y 4 MB dan 422, 4 MB sin clave da 401).
-- Historial: el alta y cada `PUT` que cambia el precio agregan una fila; un `PUT` que solo cambia `disponible` no agrega nada.
+- Historial: el alta y cada `PUT` que cambia el precio agregan una fila; un `PUT` que solo cambia `disponible` no agrega nada. `CarreraDePutsTest` cruza, contra PostgreSQL real, un cambio de precio con un `PUT` de disponibilidad y con una foto, y comprueba que `vehiculo.precio` sigue coincidiendo con la última fila del historial.
 - La clave secreta de Supabase y la de escritura no aparecen en ninguna línea de log: `SecretosEnLogsTest` sube a TRACE los loggers de la app y de Spring Web, provoca fallas de Storage y revisa la salida.
 
 **Suite contra Supabase (opcional).** La base de `vehiculos` vive en Supabase, así que la misma batería de tests de integración también se puede correr contra ella, sin tocar los datos del equipo:
@@ -525,7 +531,7 @@ Un solo modo: el servicio corre en un contenedor y se conecta a Supabase con las
 - Cubre la base (migraciones, repositorio, servicios con datos reales). Storage sigue con el `FotoStorage` falso.
 - Con el perfil `supabase`, `PostgresDePrueba` no levanta contenedor: cada contexto hace `clean` + `migrate` sobre `vehiculos_test` al arrancar. `-Psupabase` corre dos JVM en serie, una sin y otra con la etiqueta `seed`, para que los dos contextos no se pisen los datos.
 - La guarda `GuardaSchemaDePrueba` (un `EnvironmentPostProcessor` de test) se niega a arrancar si el schema no es exactamente `vehiculos_test` o si faltan las `VEHICULOS_DB_*`.
-- Es más lenta (unos 53 s con 346 tests, contra unos 18 s en Testcontainers), necesita red y el proyecto activo (no pausado). Por eso es opt-in y no es parte de `verify` por defecto.
+- Es más lenta (unos 53 s con los 346 tests de la etapa 7, contra unos 18 s en Testcontainers; hoy la suite tiene 360), necesita red y el proyecto activo (no pausado). Por eso es opt-in y no es parte de `verify` por defecto.
 
 **Manuales con Postman.** Base `http://localhost:8083`. Importar `http://localhost:8083/v3/api-docs` genera la colección. Guardar la `X-Api-Key` en un entorno de Postman y no dentro de cada request. Casos mínimos:
 
@@ -590,7 +596,7 @@ Especificaciones de la etapa 1 que las etapas siguientes deben respetar:
 - **Etapa 4 (persistencia):**
   - **[Resuelto en la etapa 4]** `ConfiguracionTransversalTest` ya no excluye DataSource, JPA ni Flyway: usa `@PruebaIntegracion` (PostgreSQL de Testcontainers) y comprueba que el health incluye la base. No se puede volver a excluirlos: `VehiculoRepositorioJpa` necesita el repositorio Spring Data.
   - **[Resuelto en la etapa 4]** Los tests de integración reutilizan `@PropiedadesDePrueba` (a través de `@PruebaIntegracion`) para no depender de las `VEHICULOS_*` del shell.
-  - Con DataSource activo, `/actuator/health` incluye la base: si el proyecto de Supabase está pausado, da `DOWN`, y con él el healthcheck del compose. La respuesta HTTP solo muestra `status` (no se expone el detalle de los componentes).
+  - **[Resuelto: verificado en la auditoría final, `ConfiguracionTransversalTest.healthIncluyeLaBaseDeDatos`]** Con DataSource activo, `/actuator/health` incluye la base: si el proyecto de Supabase está pausado, da `DOWN`, y con él el healthcheck del compose. La respuesta HTTP solo muestra `status` (no se expone el detalle de los componentes).
 - **[Resuelto en la etapa 5: queda 400, así lo documentan los `@ApiResponse` del controller]** **Etapa 5 (lectura):** un id de ruta que no es UUID responde hoy 400 `SOLICITUD_INVALIDA` (`MethodArgumentTypeMismatchException`, cubierto por un test). Si se prefiere 422 `VALIDACION`, decidirlo acá.
 - **Etapa 6 (escrituras):**
   - **[Resuelto en la etapa 6]** `ClaveServicioInvalidaException` se mapea a `CLAVE_SERVICIO_INVALIDA` 401 con `responder(...)`.
@@ -604,7 +610,7 @@ Especificaciones de la etapa 1 que las etapas siguientes deben respetar:
   - **[Resuelto en la etapa 8]** En el compose, `VEHICULOS_SUPABASE_URL` y `VEHICULOS_SUPABASE_CLAVE_SECRETA` van con `${VAR:-}` y no con `${VAR:?}`: son opcionales en modo `deshabilitado`.
   - **[Resuelto en la etapa 8: se creó `application-docker.yml`, porque sin `local` activo no hay datasource]** El perfil `docker` de la sección 10 no existe (solo hay `application-local.yml`): crear `application-docker.yml` o confirmar que las variables del compose alcanzan.
   - **[Resuelto en la etapa 8: no se valida. La validación en `VehiculosProperties` no corre antes de que Flyway y JPA se conecten y se revirtió; el error del arranque ya nombra el placeholder (`UnknownHostException: <host-pooler>`, `tenant/user vehiculos_app.<project-ref> not found`). Ver `docs/mejoras.md`]** `VehiculosProperties` no valida `VEHICULOS_DB_*` (las resuelve `spring.datasource`). Un `.env` copiado de `.env.example` sin completar el host falla recién al conectar.
-- **Etapa 9 (punta a punta):** la etapa 2 se probó solo con MockMvc. Falta ejecutar con Supabase real: `curl` a `/actuator/health` y a una ruta inexistente con `X-Correlation-Id`, y comprobar que sin `VEHICULOS_CLAVE_ESCRITURA` el servicio no arranca.
+- **[Parcial: en la etapa 8 se probaron sobre el contenedor `/actuator/health` y el arranque sin `VEHICULOS_CLAVE_ESCRITURA`; falta la ruta inexistente con `X-Correlation-Id` (A10 del paso a paso)]** **Etapa 9 (punta a punta):** la etapa 2 se probó solo con MockMvc. Falta ejecutar con Supabase real: `curl` a `/actuator/health` y a una ruta inexistente con `X-Correlation-Id`, y comprobar que sin `VEHICULOS_CLAVE_ESCRITURA` el servicio no arranca.
 
 ### Pendientes que dejó la etapa 3 (dominio)
 
@@ -643,10 +649,10 @@ Están hechos: `V1__vehiculo.sql`, `VehiculoEntity`, `PrecioHistorialEntity`, su
   - **[Resuelto en la etapa 6]** `registrarPrecio` no comprueba que el precio coincida con `vehiculo.precio`: mantener "la fila más reciente coincide con el precio actual" es responsabilidad del servicio. Tampoco decide si escribir: el servicio compara el precio nuevo con el actual y no registra nada si solo cambia `disponible` o si el precio es igual.
   - **[Resuelto en la etapa 6]** `guardar` renueva `actualizado_en` en cada llamada, aunque no haya cambios. El servicio no debe llamarlo si no cambió nada.
   - **[Resuelto en la etapa 6]** `registrarPrecio` con un `vehiculoId` inexistente lanza `DataIntegrityViolationException` (clave foránea), no `VehiculoNoEncontradoException`: el servicio debe buscar la unidad antes (y ya lo hace para el 404).
-  - `buscar(Boolean)` devuelve las unidades de la más nueva a la más vieja (`creado_en DESC`, desempate por `id`); el doc de la API no define otro orden. `historialDePrecios` va del más nuevo al más viejo.
+  - **[Resuelto: verificado en la auditoría final, `VehiculoRepositorioJpaTest.buscarSinFiltroDevuelveTodasDeLaMasNuevaALaMasVieja` y la descripción de `GET /vehiculos`]** `buscar(Boolean)` devuelve las unidades de la más nueva a la más vieja (`creado_en DESC`, desempate por `id`); el doc de la API no define otro orden. `historialDePrecios` va del más nuevo al más viejo.
   - **[Resuelto en la etapa 6: un dato guardado inválido da 500 y solo la entrada del cliente da 422]** Un `GET` de una unidad con datos cargados a mano fuera de las invariantes (por ejemplo `anio` fuera de rango) lanza `VehiculoInvalidoException` al leer. Mientras esa excepción no esté mapeada da 500, y cuando la etapa 6 la mapee a `VALIDACION` 422, un `GET` respondería 422 por un dato guardado. Decidir si conviene distinguir "dato de entrada inválido" de "dato guardado inválido".
 - **Etapa 9 (punta a punta):**
-  - **[Verificado el 2026-10-09]** La V1 se aplicó contra Supabase al arrancar con `spring-boot:run` (perfil `local`): tablas e índices creados en el schema `vehiculos` y `/actuator/health` en `UP`. Queda como lista de chequeo para repetirlo en la prueba de punta a punta (sobre el contenedor): que el rol `vehiculos_app` tenga permiso para crear tablas e índices en el schema `vehiculos`, que existan `vehiculo` y `precio_historial` en el dashboard, que `/actuator/health` dé `UP` y que desaparezca el WARN `No migrations found`.
+  - **[Resuelto en la etapa 8: el contenedor quedó `healthy`, Flyway validó 2 migraciones sin `No migrations found`; la auditoría final confirmó en la base las dos filas con `success = true`]** **[Verificado el 2026-10-09]** La V1 se aplicó contra Supabase al arrancar con `spring-boot:run` (perfil `local`): tablas e índices creados en el schema `vehiculos` y `/actuator/health` en `UP`. Queda como lista de chequeo para repetirlo en la prueba de punta a punta (sobre el contenedor): que el rol `vehiculos_app` tenga permiso para crear tablas e índices en el schema `vehiculos`, que existan `vehiculo` y `precio_historial` en el dashboard, que `/actuator/health` dé `UP` y que desaparezca el WARN `No migrations found`.
   - Esa migración ya no se edita una vez mergeada: cualquier cambio de esquema es una `V2` (regla 4 de `CLAUDE.md`).
 - **Pruebas:** los tests de integración necesitan Docker abierto. Usan `postgres:17-alpine` y arrancan un contenedor por ejecución (compartido por todas las clases que comparten contexto). Los tests de repositorio corren dentro de una transacción que se revierte; las consultas nativas en tests deben calificar el schema tomándolo de `spring.jpa.properties.hibernate.default_schema` (`@Value`), porque `hibernate.default_schema` solo aplica a las consultas de Hibernate y la suite corre en `vehiculos` y en `vehiculos_test`. `RelojDePrueba` es un bean compartido: cada test que lo avanza debe reiniciarlo (`reiniciar()`).
 
@@ -675,7 +681,7 @@ Está hecho: `db/seed/R__seed_vehiculos.sql`, `application-seed.yml` y `SeedTest
   - Antes de borrar el seed con SQL, ver la nota "Para limpiar el seed" más abajo: las filas de historial agregadas por la API no tienen el prefijo `b0000000`.
 - **[Resuelto en la etapa 7: probado con el Fiesta, `fotoUrl` pasó de `null` a la URL pública y el objeto se borró después del bucket]** **Etapa 7 (fotos):** las unidades sembradas tienen `foto_url = NULL`. Probar `PUT /vehiculos/{id}/foto` sobre una de ellas y comprobar que `fotoUrl` pasa a tener valor. Esto cambia el seed en esa base: al limpiar o recargar, el objeto del bucket `vehiculos-fotos` (`{vehiculoId}.{ext}`) queda huérfano y hay que borrarlo a mano.
 - **[Resuelto en la etapa 8: el seed queda solo para `local`; el compose fija `SPRING_PROFILES_ACTIVE: docker`]** **Etapa 8 (Docker):** decidir si el compose acepta `SPRING_PROFILES_ACTIVE=docker,seed` (el `application-seed.yml` ya sirve sin cambios) o si el seed queda solo para `local`. Si se permite, el contenedor apunta a la misma base compartida: aplica lo mismo que en la etapa 5 (avisar al equipo).
-- **Etapa 9 (punta a punta):** repetir la lista de la etapa 5 sobre el contenedor, partiendo de la base con el seed ya cargado. Chequear también que el WARN `No migrations found` sigue sin aparecer y que `flyway_schema_history` no tiene filas fallidas.
+- **[Parcial: la auditoría final confirmó que `flyway_schema_history` no tiene filas fallidas; la lista completa sobre el contenedor no tiene registro y los conteos 10/8/2 no valen hoy porque la base tiene datos agregados a propósito]** **Etapa 9 (punta a punta):** repetir la lista de la etapa 5 sobre el contenedor, partiendo de la base con el seed ya cargado. Chequear también que el WARN `No migrations found` sigue sin aparecer y que `flyway_schema_history` no tiene filas fallidas.
 - **Resueltos al cerrar el seed:** `CLAUDE.md` ya dice `postgres:17-alpine` en la línea de Stack, y las pruebas manuales se hacen con Postman (`CLAUDE.md` y este documento lo dicen en todos lados; si aparece "Insomnia" en algún lugar nuevo, corregirlo).
 - **Si se edita el seed:** Flyway lo vuelve a ejecutar (cambia el checksum), pero `ON CONFLICT DO NOTHING` no actualiza filas existentes. Para corregir un dato ya cargado: borrar las filas por id (primero `precio_historial`, después `vehiculo`) y volver a correr con `seed`. Nunca editar la `V1` por esto.
 - **Si se agrega una `V2` que cambie las tablas o las columnas de `vehiculo` / `precio_historial`:** revisar que el `R__` siga siendo válido. Una columna nueva `NOT NULL` sin `DEFAULT` lo rompería. Revisarlo antes de mergear la `V2`, y correr `SeedTest`.
@@ -697,7 +703,7 @@ Está hecho: el perfil Maven `supabase`, `application-supabase.yml` y `applicati
 - **[Resuelto en la etapa 7]** **Etapa 4, nota de pruebas:** dice que las consultas nativas califican `vehiculos.vehiculo`. Ahora toman el schema de `spring.jpa.properties.hibernate.default_schema` (`@Value`), para correr igual en `vehiculos` y en `vehiculos_test`.
 - **Corridas concurrentes:** cada contexto limpia `vehiculos_test` al arrancar, así que dos integrantes que corran `-Psupabase` a la vez se borran el schema mutuamente. Mientras no haya un lock (ver `docs/mejoras.md`), la suite contra Supabase la corre solo el responsable de `vehiculos`.
 - **[Resuelto en la etapa 6]** **Etapa 6 (escrituras):** los tests nuevos van con `@PruebaIntegracion` (o `@PruebaIntegracionSeed`) y `@Transactional`, para que se revierta. Una escritura que se confirme queda en la base durante el resto de la corrida y rompe los tests que esperan la base vacía; en Supabase, además, el contexto es uno solo por JVM. Un test con seed que no use `@PruebaIntegracionSeed` correría en la JVM sin seed y la ensuciaría.
-- **Contextos:** la suite tiene 5 contextos (2 con base y 3 `@WebMvcTest`); desde la etapa 7 son 6 (4 `@WebMvcTest`). Antes de agregar una configuración propia a un test de integración (un `@Import`, un `@MockitoBean`, otro perfil), considerar que crea un contexto nuevo: en Supabase limpia el schema otra vez y suma 2 conexiones al session pooler.
+- **[Resuelto: verificado en la auditoría final, los reportes de surefire muestran 6 contextos]** **Contextos:** la suite tiene 5 contextos (2 con base y 3 `@WebMvcTest`); desde la etapa 7 son 6 (4 `@WebMvcTest`). Antes de agregar una configuración propia a un test de integración (un `@Import`, un `@MockitoBean`, otro perfil), considerar que crea un contexto nuevo: en Supabase limpia el schema otra vez y suma 2 conexiones al session pooler.
 - **No probado:** el mensaje de "proyecto pausado" de la estrategia de limpieza. Probarlo la próxima vez que el proyecto esté pausado, antes de reactivarlo.
 
 Decisiones de la etapa 5.1 que las etapas siguientes deben respetar:
@@ -727,10 +733,10 @@ Está hecho: `@RequiereClaveServicio`, `ClaveServicioInterceptor` y `ClaveServic
   - **[Resuelto en la etapa 7]** §12: sumar a Postman el caso "`PUT` con un campo no admitido → 422" y "`POST` con `anio` 2028 → 422".
 - **Año máximo:** el DTO valida `@Max(2027)` fijo (decisión del 2026-10-10: el TP se presenta en 2026) y el Builder valida "año actual + 1". Durante 2026 coinciden; desde el 1/1/2027 el DTO rechazaría 2028 aunque el dominio lo acepte, y si se cambia el DTO sin el dominio el 422 saldría sin `errores` (ver arriba).
 - **Etapa 9 (punta a punta):**
-  - Repetir los casos 4 a 9 y 12 sobre el contenedor.
-  - La prueba de la etapa 6 dejó datos en `vehiculos`: la unidad `93a56a83-07fd-452e-be77-378d31d4e948` (marca "Ficticia", con 1 fila de historial) y el Corolla sembrado `a0000000-0000-4000-8000-000000000001` con precio 23900000.00 y una segunda fila de historial (`disponible` quedó en `true`). Para limpiar: `DELETE FROM vehiculos.precio_historial WHERE vehiculo_id = '93a56a83-07fd-452e-be77-378d31d4e948'`, `DELETE FROM vehiculos.vehiculo WHERE id = '93a56a83-07fd-452e-be77-378d31d4e948'`; y para el Corolla, `DELETE FROM vehiculos.precio_historial WHERE vehiculo_id = 'a0000000-0000-4000-8000-000000000001' AND id::text NOT LIKE 'b0000000-%'` y `UPDATE vehiculos.vehiculo SET precio = 24500000.00 WHERE id = 'a0000000-0000-4000-8000-000000000001'`. Con eso los números de la etapa 5 (10, 8, 2) vuelven a valer.
+  - **[Parcial: sobre el contenedor se probaron el 4 y el 7 (etapa 8); no hay registro de 5, 6, 8, 9 ni 12]** Repetir los casos 4 a 9 y 12 sobre el contenedor.
+  - **[Resuelto: verificado en la auditoría final; `93a56a83` ya no existe y la fila de la etapa 6 del Corolla tampoco. Los datos que tiene hoy el Corolla se agregaron a propósito]** La prueba de la etapa 6 dejó datos en `vehiculos`: la unidad `93a56a83-07fd-452e-be77-378d31d4e948` (marca "Ficticia", con 1 fila de historial) y el Corolla sembrado `a0000000-0000-4000-8000-000000000001` con precio 23900000.00 y una segunda fila de historial (`disponible` quedó en `true`). Para limpiar: `DELETE FROM vehiculos.precio_historial WHERE vehiculo_id = '93a56a83-07fd-452e-be77-378d31d4e948'`, `DELETE FROM vehiculos.vehiculo WHERE id = '93a56a83-07fd-452e-be77-378d31d4e948'`; y para el Corolla, `DELETE FROM vehiculos.precio_historial WHERE vehiculo_id = 'a0000000-0000-4000-8000-000000000001' AND id::text NOT LIKE 'b0000000-%'` y `UPDATE vehiculos.vehiculo SET precio = 24500000.00 WHERE id = 'a0000000-0000-4000-8000-000000000001'`. Con eso los números de la etapa 5 (10, 8, 2) vuelven a valer.
 - **[Resuelto en la etapa 7: §12 da la duración actual; la entrada de `docs/mejoras.md` queda como historial, porque ese archivo solo se agrega]** **Etapa 5.1:** la duración de `-Psupabase` bajó a 52 s (cada `clean` tarda menos de 1 s). La nota de "~3 min 40 s" y la mejora de duración de `docs/mejoras.md` quedan desactualizadas.
-- **Concurrencia:** dos `PUT` que cambian el precio de la misma unidad en el mismo microsegundo hacen fallar `registrarPrecio` (`vigente_desde` debe ser posterior a la última fila) y responden 500. Es coherente con "el último `PUT` gana" y no hay control optimista; no se corrige.
+- **[Incompleto: la auditoría final encontró un caso que deja el historial incoherente; ver "Pendientes que dejó la auditoría final"]** **[Resuelto en la auditoría final, con bloqueo de fila: las escrituras leen con `buscarPorIdParaActualizar` (`SELECT … FOR UPDATE`) y la segunda espera a que la primera confirme; `CarreraDePutsTest`]** **Concurrencia:** dos `PUT` que cambian el precio de la misma unidad en el mismo microsegundo hacen fallar `registrarPrecio` (`vigente_desde` debe ser posterior a la última fila) y responden 500. Es coherente con "el último `PUT` gana" y no hay control optimista; no se corrige.
 
 Decisiones de la etapa 6 que las etapas siguientes deben respetar:
 
@@ -757,9 +763,9 @@ Está hecho: `TipoFoto`, `ArchivoFoto` y el puerto `FotoStorage` en el dominio; 
   - Pruebas: `@PruebaIntegracion` corre con `RANDOM_PORT` e importa `FotoStorageEnMemoria` (`@Primary`, como `RelojDePrueba`, con `reiniciar()`). `FotoApiTest` usa el servidor real para los límites multipart (MockMvc no los aplica). La suite tiene ahora 6 contextos: 2 con base y 4 `@WebMvcTest` (`SecretosEnLogsTest` suma uno, sin base).
 - **[Resuelto en la etapa 8: a través del contenedor, 4 MB sin clave dieron 401 sin cortar la conexión, y con clave 422 `FOTO_INVALIDA`]** **Etapa 8 (Docker):** Tomcat descarta como máximo 2 MB del cuerpo de un request rechazado (`server.tomcat.max-swallow-size`). Un 401 a una subida de más de 2 MB puede cerrar la conexión; con `curl` en local llegó el 401 bien. Comprobarlo detrás del contenedor.
 - **Etapa 9 (punta a punta):**
-  - Repetir los casos 10 y 11 sobre el contenedor (Postman, Body multipart, campo `archivo`).
-  - La prueba de la etapa 7 dejó la unidad `93a56a83-07fd-452e-be77-378d31d4e948` con `foto_url` apuntando a `93a56a83-….jpg`, que ya se borró del bucket. Para limpiar: `UPDATE vehiculos.vehiculo SET foto_url = NULL WHERE id = '93a56a83-07fd-452e-be77-378d31d4e948'` (junto con la limpieza de la etapa 6).
-  - Las verificaciones del seed de la etapa 7 dejaron dos cambios en unidades sembradas. El Fiesta (`a0000000-0000-4000-8000-000000000002`) tiene `foto_url` apuntando a un objeto ya borrado, así que "`foto_url` en `NULL` en todas" deja de valer hasta limpiarlo. El Sandero (`a0000000-0000-4000-8000-000000000005`) quedó con `disponible = false`, como estaba, pero con `actualizado_en` de 2026-10-10 en vez de 2026-09-05 10:00:00+00. Para limpiar: `UPDATE vehiculos.vehiculo SET foto_url = NULL WHERE id = 'a0000000-0000-4000-8000-000000000002'` y `UPDATE vehiculos.vehiculo SET actualizado_en = '2026-09-05 10:00:00+00' WHERE id = 'a0000000-0000-4000-8000-000000000005'`.
+  - **[Parcial: el caso 10 se probó sobre el contenedor en la etapa 8; el 11 (PDF) no tiene registro]** Repetir los casos 10 y 11 sobre el contenedor (Postman, Body multipart, campo `archivo`).
+  - **[Resuelto: verificado en la auditoría final, la unidad `93a56a83` ya no existe]** La prueba de la etapa 7 dejó la unidad `93a56a83-07fd-452e-be77-378d31d4e948` con `foto_url` apuntando a `93a56a83-….jpg`, que ya se borró del bucket. Para limpiar: `UPDATE vehiculos.vehiculo SET foto_url = NULL WHERE id = '93a56a83-07fd-452e-be77-378d31d4e948'` (junto con la limpieza de la etapa 6).
+  - **[Resuelto: verificado en la auditoría final; ninguna unidad tiene `foto_url` y el Sandero tiene `actualizado_en` 2026-09-05 10:00:00+00]** Las verificaciones del seed de la etapa 7 dejaron dos cambios en unidades sembradas. El Fiesta (`a0000000-0000-4000-8000-000000000002`) tiene `foto_url` apuntando a un objeto ya borrado, así que "`foto_url` en `NULL` en todas" deja de valer hasta limpiarlo. El Sandero (`a0000000-0000-4000-8000-000000000005`) quedó con `disponible = false`, como estaba, pero con `actualizado_en` de 2026-10-10 en vez de 2026-09-05 10:00:00+00. Para limpiar: `UPDATE vehiculos.vehiculo SET foto_url = NULL WHERE id = 'a0000000-0000-4000-8000-000000000002'` y `UPDATE vehiculos.vehiculo SET actualizado_en = '2026-09-05 10:00:00+00' WHERE id = 'a0000000-0000-4000-8000-000000000005'`.
 
 Decisiones de la etapa 7 que las etapas siguientes deben respetar:
 
@@ -782,10 +788,10 @@ Está hecho: `Dockerfile` y `.dockerignore` en la raíz, `infra/docker-compose.y
 Lo que quedó:
 
 - **Etapa 9 (punta a punta):**
-  - La prueba de la etapa 8 dejó en `vehiculos` la unidad `ec1b5aae-2202-4ea6-8c4a-be64b8d3796a` (marca "Ficticia", modelo "Contenedor", 1 fila de historial), con la foto `ec1b5aae-2202-4ea6-8c4a-be64b8d3796a.png` en el bucket `vehiculos-fotos`. Para limpiar, junto con la limpieza de las etapas 6 y 7: `DELETE FROM vehiculos.precio_historial WHERE vehiculo_id = 'ec1b5aae-2202-4ea6-8c4a-be64b8d3796a'`, después `DELETE FROM vehiculos.vehiculo WHERE id = 'ec1b5aae-2202-4ea6-8c4a-be64b8d3796a'`, y borrar el objeto del bucket. Los conteos de la etapa 5 (`?disponible=true`) suben en 1 hasta limpiarla.
+  - **[Resuelto: verificado en la auditoría final; la unidad `ec1b5aae` ya no está en la tabla ni su foto en el bucket]** La prueba de la etapa 8 dejó en `vehiculos` la unidad `ec1b5aae-2202-4ea6-8c4a-be64b8d3796a` (marca "Ficticia", modelo "Contenedor", 1 fila de historial), con la foto `ec1b5aae-2202-4ea6-8c4a-be64b8d3796a.png` en el bucket `vehiculos-fotos`. Para limpiar, junto con la limpieza de las etapas 6 y 7: `DELETE FROM vehiculos.precio_historial WHERE vehiculo_id = 'ec1b5aae-2202-4ea6-8c4a-be64b8d3796a'`, después `DELETE FROM vehiculos.vehiculo WHERE id = 'ec1b5aae-2202-4ea6-8c4a-be64b8d3796a'`, y borrar el objeto del bucket. Los conteos de la etapa 5 (`?disponible=true`) suben en 1 hasta limpiarla.
   - De la lista de la etapa 2 ya se probaron sobre el contenedor `/actuator/health` y el arranque sin `VEHICULOS_CLAVE_ESCRITURA`. Falta `curl` a una ruta inexistente con `X-Correlation-Id`.
-  - Sigue pendiente revisar que `flyway_schema_history` no tenga filas fallidas (pendiente del seed).
-- **Comentario de `application.yml` desactualizado:** dice que si falta una variable Spring falla con `Could not resolve placeholder`. En la prueba, sin `VEHICULOS_CLAVE_ESCRITURA`, el binding recibió el texto literal `${VEHICULOS_CLAVE_ESCRITURA}` y lo rechazó `VehiculosProperties` ("debe tener al menos 32 caracteres" y "tiene un placeholder sin completar"). El servicio no arranca igual; corregir el comentario cuando se toque ese archivo.
+  - **[Resuelto: verificado en la auditoría final, `V1` y `seed vehiculos` con `success = true` y ninguna fila fallida]** Sigue pendiente revisar que `flyway_schema_history` no tenga filas fallidas (pendiente del seed).
+- **[Resuelto en la auditoría final]** **Comentario de `application.yml` desactualizado:** dice que si falta una variable Spring falla con `Could not resolve placeholder`. En la prueba, sin `VEHICULOS_CLAVE_ESCRITURA`, el binding recibió el texto literal `${VEHICULOS_CLAVE_ESCRITURA}` y lo rechazó `VehiculosProperties` ("debe tener al menos 32 caracteres" y "tiene un placeholder sin completar"). El servicio no arranca igual; corregir el comentario cuando se toque ese archivo.
 - **Variables del shell y compose:** si la terminal tiene las `VEHICULOS_*` cargadas (`cargar-env.sh`), compose usa esas antes que las de `infra/.env` o `--env-file`. Para levantar con las del archivo, usar una terminal sin cargarlas.
 - **Flyway en el contenedor:** el perfil `docker` no tiene el seed, pero aplica `db/migration` al arrancar. Antes de mergear una `V2`, decidir si se deshabilita Flyway en `docker` (ver `docs/mejoras.md`), porque el primer integrante que levante el compose la aplicaría en la base compartida.
 - **Host del pooler en el log:** Flyway imprime la URL JDBC (`aws-1-sa-east-1.pooler.supabase.com`). No es un secreto (usuario y clave van aparte); no hace falta tocarlo.
@@ -804,7 +810,7 @@ Decisiones de la etapa 8 que las etapas siguientes deben respetar:
 
 En la prueba con Postman sobre el contenedor falló E7 (`PUT /vehiculos/{id}/foto` con Body *raw* JSON): dio 500 `ERROR_INTERNO` en vez de 415. Causa: la colección importada de `/v3/api-docs` trae un header explícito `Content-Type: multipart/form-data`, y Postman lo conserva al pasar el Body a *raw*. El pedido llegaba como multipart sin boundary, pasaba el `consumes` y el interceptor, y con `resolve-lazily` Tomcat fallaba al parsear (`no multipart boundary was found`) al resolver el argumento. La `MultipartException` no tenía mapeo y caía en `ERROR_INTERNO`. Está hecho: `ApiExceptionHandler` mapea `MultipartException`, se sacó `consumes` del mapping y el body de OpenAPI se declara a mano. `verify` pasa en Testcontainers (350 tests); no se corrió `-Psupabase`. Se probó con `curl` contra el contenedor el 2026-10-11: E5 422, E6 400, E7 con `application/json` 415, E7 con multipart sin boundary 400, E7 sin clave 401, E8 404 y B5 401, sin `ERROR` en los logs. Lo que quedó:
 
-- **E7 del paso a paso:** con el header `Content-Type: multipart/form-data` de la colección, la respuesta correcta es 400 `SOLICITUD_INVALIDA` (multipart mal formado), no 415. El 415 sale solo destildando ese header, así llega `application/json`. Corregir la consigna de E7 y sumar un caso aparte para el multipart mal formado.
+- **[Resuelto en la auditoría final: E7 (header destildado, 415) y E7b (header puesto, 400) en el paso a paso]** **E7 del paso a paso:** con el header `Content-Type: multipart/form-data` de la colección, la respuesta correcta es 400 `SOLICITUD_INVALIDA` (multipart mal formado), no 415. El 415 sale solo destildando ese header, así llega `application/json`. Corregir la consigna de E7 y sumar un caso aparte para el multipart mal formado.
 - **Repetir E7 en Postman** con las dos variantes (header destildado: 415; header puesto: 400) y E1 después de reimportar `/v3/api-docs`, para confirmar que la subida sigue funcionando con la documentación nueva.
 
 Decisiones de la etapa 9 que las etapas siguientes deben respetar:
@@ -814,6 +820,32 @@ Decisiones de la etapa 9 que las etapas siguientes deben respetar:
 - Orden de errores del `PUT` de foto: 401 → 415/400 → 404 → 422 → 503. El cuerpo se lee al resolver el argumento, antes de buscar la unidad.
 - El body de OpenAPI va en `@Operation(requestBody = ...)` como `multipart/form-data` con `archivo` binario y obligatorio, y el parámetro lleva `@Parameter(hidden = true)`. Sin `consumes`, springdoc lo documenta como `application/json`, y si solo se agrega el `requestBody` lista los dos media types. `VehiculoEscrituraApiTest.laDocumentacionDeLaFotoPideMultipart` lo cubre.
 - Los casos de multipart mal formado se prueban en `FotoApiTest`, con el servidor real.
+
+### Pendientes que dejó la auditoría final
+
+La auditoría del 2026-10-11 (`vehiculos-auditoria.md`, rama `feature/vehiculos-auditoria`) no modificó código. `verify` pasa en Testcontainers (350 tests). Lo que quedó:
+
+- **[Resuelto en la auditoría final: `buscarPorIdParaActualizar` con `PESSIMISTIC_WRITE` en el `PUT` y en la transacción de la foto; `CarreraDePutsTest` falló antes del arreglo y §6 está actualizado]** **Concurrencia: dos `PUT` dejan el historial incoherente (lost update).** `ActualizacionVehiculoService` lee la unidad sin bloquear y `guardar` reescribe todos los campos. Si un `PUT` que solo cambia `disponible` lee antes de que otro `PUT` confirme un cambio de precio, al guardar vuelve a escribir el precio viejo. Reproducido contra PostgreSQL de Testcontainers: `vehiculo.precio` quedó en 1.000.000 y la última fila del historial en 2.000.000. Rompe la regla de §6 ("su fila más reciente coincide siempre con `vehiculo.precio`"). La transacción corta de `FotoVehiculoService` tiene el mismo problema. La nota de concurrencia de la etapa 6 solo contempla el 500 por instantes iguales y queda incompleta. Arreglo propuesto: un método del puerto `buscarPorIdParaActualizar(UUID)` con `@Lock(LockModeType.PESSIMISTIC_WRITE)` (`SELECT … FOR UPDATE`), usado por las dos escrituras, con un test de carrera que falle antes del arreglo. Sigue ganando el último `PUT` y desaparece también el 500 por instantes invertidos. Al resolverlo, actualizar §6.
+- **[Resuelto en la auditoría final]** **E7 del paso a paso sin corregir:** `docs/paso-a-paso-claude-code.md` (E7) sigue esperando `415`. Con el header `Content-Type: multipart/form-data` de la colección, la respuesta correcta es `400 SOLICITUD_INVALIDA`. Separar E7 (header destildado, `415`) y un caso nuevo (header puesto, `400`). Es el mismo pendiente de la etapa 9.
+- **[Resuelto en la auditoría final]** **§7 contradice la decisión de la etapa 9:** el flujo de `PUT /vehiculos/{id}/foto` en §7 dice "401 → 404 → 422 → 503", y la decisión de la etapa 9 es "401 → 415/400 → 404 → 422 → 503", que es lo que hace el código (`FotoApiTest`). Corregir §7 y la fila de la foto en §5.1, que no lista el 400 por multipart mal formado.
+- **[Resuelto en la auditoría final, con otro enfoque: el README explica cómo correrlo; `CLAUDE.md` sigue fuera del repo a propósito]** **`CLAUDE.md` no está versionado y el `README.md` está vacío:** `.gitignore` ignora `CLAUDE.md` y nunca se commiteó, pero este documento cita sus reglas (por ejemplo, la regla 4). Quien clone el repo no tiene las reglas ni los comandos para correrlo. Decidir si se versiona `CLAUDE.md` o si las reglas y los comandos pasan al README.
+- **[Resuelto en la auditoría final]** **Huecos del documento (el código hace algo que el doc no dice):**
+  - §2 no lista `AltaVehiculo` ni `DatosInvalidosException` (`application`), `Precios` (`api.dto`) ni `VehiculosProperties.ModoFotos`.
+  - §3.2 no dice que `CorrelationIdFilter` descarta un `X-Correlation-Id` que no cumpla `[A-Za-z0-9._-]{1,64}` y genera uno nuevo.
+  - §9.3 y §10 no mencionan `spring.flyway.ignore-migration-patterns: "*:future,repeatable:missing"`, del que depende arrancar sin `seed` sobre una base sembrada (`ArranqueSinSeedTest`).
+  - §5.3 muestra `"precio": 10000000`, pero la API responde siempre con escala 2 (`10000000.00`).
+  - §12 habla de 346 tests y hoy son 350.
+- **[Resuelto en la auditoría final]** **Comentario de `application.yml` (pendiente de la etapa 8):** sigue sin corregir. Texto propuesto: `# Sin valor por defecto: si falta una variable, el binding recibe el texto literal ${VAR} y VehiculosProperties lo rechaza.`
+- **Año máximo (pendiente de la etapa 6):** sigue vigente. `@Max(2027)` fijo en el DTO contra "año actual + 1" en el Builder.
+- **Colección de Postman:** cada request de `docs/Servicio de Vehículos.postman_collection.json` trae el header literal `X-Api-Key: <API Key>`, además del auth de colección `{{apiKey}}`. No se verificó en Postman si ese header tapa al auth. Revisarlo al reimportar, o borrar el header de cada request.
+- **[Parcial: la concurrencia quedó cubierta con `CarreraDePutsTest`; faltan el rollback del alta, la subida correcta con falla en la base y el año del DTO contra el del Builder]** **Huecos de tests:**
+  - concurrencia (el test de carrera de arriba);
+  - rollback del alta si falla `registrarPrecio`;
+  - subida a Storage correcta con falla al guardar en la base (objeto huérfano, base sin cambios);
+  - que el máximo de `anio` del DTO coincida con el del Builder.
+- **Consultas de solo lectura contra Supabase:** `PGOPTIONS="-c default_transaction_read_only=on"` no llega a la base a través del session pooler. Para auditar sin riesgo de escribir, abrir la sesión con `BEGIN READ ONLY`.
+- **[Parcial: se hicieron la coerción de Jackson (`accept-float-as-int` y `allow-coercion-of-scalars` en `false`), el `.gitignore` y el reloj en `@BeforeEach`; el resto sigue en `docs/mejoras.md`]** **Mejoras:** las de la auditoría (coerción de enteros en Jackson, validador de año, ciclo `api` ↔ `config`, `.gitignore`, puerto en localhost, pool de Hikari, reloj en `@BeforeEach`) están en `docs/mejoras.md`.
+- **Datos en la base compartida:** las unidades y las filas de historial que no son del seed (por ejemplo la Honda City `bdeba8e2-…` y el precio actual del Corolla) y el objeto `8ab1e0d0-….jpg` del bucket están a propósito. No hay que limpiarlos.
 
 ---
 

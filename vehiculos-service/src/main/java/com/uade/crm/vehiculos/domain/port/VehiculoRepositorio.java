@@ -23,6 +23,8 @@ public interface VehiculoRepositorio {
 
     Optional<Vehiculo> buscarPorId(UUID id);
 
+    Optional<Vehiculo> buscarPorIdParaActualizar(UUID id);
+
     /**
      * Inserta la unidad o actualiza la existente. La persistencia fija {@code creadoEn} en el alta y
      * {@code actualizadoEn} en cada llamada.

@@ -308,7 +308,8 @@ En Supabase, con la consulta E2E:
 | E4 | Con `falso.png` | `422`, `FOTO_INVALIDA`: el tipo se detecta por los bytes, no por el nombre |
 | E5 | Con `grande.jpg` | `422`, `FOTO_INVALIDA`, nunca `413` ni `500` |
 | E6 | Key con otro nombre (`foto` en vez de `archivo`) | `400` |
-| E7 | Body *raw* JSON en vez de *form-data* | `415` |
+| E7 | Body *raw* JSON en vez de *form-data*, con el header `Content-Type: multipart/form-data` de la colección destildado | `415`, `SOLICITUD_INVALIDA` |
+| E7b | Body *raw* JSON con el header `Content-Type: multipart/form-data` de la colección puesto (multipart sin boundary) | `400`, `SOLICITUD_INVALIDA` |
 | E8 | `PUT /vehiculos/{{idInexistente}}/foto` con `auto.png` | `404` |
 
 En Supabase:

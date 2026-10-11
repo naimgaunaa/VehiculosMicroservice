@@ -114,6 +114,7 @@ class FotoVehiculoServiceTest {
     @Test
     void unPngValidoSeSubeSeAsignaYSeGuardaUnaVez() {
         unidadSinFoto();
+        releeDentroDeLaTransaccion(unidad(null));
         guardarDevuelveLoRecibido();
 
         Vehiculo resultado = servicio.asignar(ID, png(1024));
@@ -131,6 +132,7 @@ class FotoVehiculoServiceTest {
     void reemplazarPorOtraExtensionEliminaElObjetoViejoDespuesDeConfirmar() {
         storage.precargar(URL_PNG, ArchivoFoto.de(png(100)));
         when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(unidad(URL_PNG)));
+        releeDentroDeLaTransaccion(unidad(URL_PNG));
         guardarDevuelveLoRecibido();
 
         Vehiculo resultado = servicio.asignar(ID, jpeg(1024));
@@ -145,6 +147,7 @@ class FotoVehiculoServiceTest {
     void reemplazarConLaMismaExtensionNoElimina() {
         storage.precargar(URL_PNG, ArchivoFoto.de(png(100)));
         when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(unidad(URL_PNG)));
+        releeDentroDeLaTransaccion(unidad(URL_PNG));
         guardarDevuelveLoRecibido();
 
         servicio.asignar(ID, png(2048));
@@ -156,6 +159,7 @@ class FotoVehiculoServiceTest {
     @Test
     void siFallaElBorradoDelViejoIgualDevuelveLaUnidadGuardada() {
         when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(unidad(URL_PNG)));
+        releeDentroDeLaTransaccion(unidad(URL_PNG));
         guardarDevuelveLoRecibido();
         storage.fallarBorrado();
 
@@ -201,7 +205,8 @@ class FotoVehiculoServiceTest {
         Vehiculo leida = unidad(null);
         Vehiculo actualizada = unidad(null);
         actualizada.actualizarPrecio(new BigDecimal("11000000"));
-        when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(leida), Optional.of(actualizada));
+        when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(leida));
+        releeDentroDeLaTransaccion(actualizada);
         guardarDevuelveLoRecibido();
 
         servicio.asignar(ID, png(1024));
@@ -226,6 +231,10 @@ class FotoVehiculoServiceTest {
 
     private void unidadSinFoto() {
         when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(unidad(null)));
+    }
+
+    private void releeDentroDeLaTransaccion(Vehiculo unidad) {
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenReturn(Optional.of(unidad));
     }
 
     private void guardarDevuelveLoRecibido() {
