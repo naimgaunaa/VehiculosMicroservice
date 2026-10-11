@@ -1,0 +1,64 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: vehiculos-service
+  profiles:
+    default: local
+  web:
+    locale: es
+    locale-resolver: fixed
+  servlet:
+    multipart:
+      # Spring corta en 1 MB por defecto: con 3 MB el límite de 2 MB lo aplica el servicio (422 FOTO_INVALIDA).
+      # Diferido: el archivo se lee al resolver el argumento, después del interceptor de X-Api-Key (401 primero).
+      max-file-size: 3MB
+      max-request-size: 3MB
+      resolve-lazily: true
+  jackson:
+    mapper:
+      allow-coercion-of-scalars: false
+    deserialization:
+      fail-on-unknown-properties: true
+      accept-float-as-int: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: vehiculos
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: vehiculos
+    # Una base que ya recibió el seed (perfil seed) tiene la repetible en flyway_schema_history y, sin ese perfil,
+    # Flyway no la encuentra y falla al validar. Se ignora solo ese caso: una V aplicada que falta sigue fallando.
+    # *:future es el valor por defecto de Flyway y hay que repetirlo porque esta lista lo reemplaza.
+    ignore-migration-patterns: "*:future,repeatable:missing"
+
+# Sin valor por defecto: si falta una variable, el binding recibe el texto literal ${VAR} y VehiculosProperties lo rechaza.
+# Las de Supabase pueden quedar vacías en modo deshabilitado; VehiculosProperties las exige en modo supabase.
+vehiculos:
+  modo-fotos: ${VEHICULOS_FOTOS_MODO}
+  bucket-fotos: ${VEHICULOS_FOTOS_BUCKET}
+  supabase-url: ${VEHICULOS_SUPABASE_URL:}
+  supabase-clave-secreta: ${VEHICULOS_SUPABASE_CLAVE_SECRETA:}
+  clave-escritura: ${VEHICULOS_CLAVE_ESCRITURA}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- El correlationId lo pone CorrelationIdFilter en el MDC; fuera de un request queda vacío. -->
+    <property name="PATRON_LOG"
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p [%X{correlationId:-}] %logger{36} - %msg%n%wEx"/>
+
+    <appender name="CONSOLA" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${PATRON_LOG}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLA"/>
+    </root>
+
+    <springProfile name="local">
+        <logger name="com.uade.crm.vehiculos" level="DEBUG"/>
+    </springProfile>
+</configuration>

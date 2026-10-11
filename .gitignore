@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+target/
+.idea/
+.vscode/
+*.log
+.agents
+.claude
+CLAUDE.md
