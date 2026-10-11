@@ -1,0 +1,2028 @@
+{
+	"info": {
+		"_postman_id": "a2de2089-8599-4b88-a471-a37b65c5a817",
+		"name": "Servicio de Vehículos",
+		"description": "Inventario de la agencia de autos usados: unidades, precios, historial de precios y fotos.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25050274"
+	},
+	"item": [
+		{
+			"name": "vehiculos",
+			"item": [
+				{
+					"name": "{id}",
+					"item": [
+						{
+							"name": "foto",
+							"item": [
+								{
+									"name": "Carga o reemplaza la foto de una unidad",
+									"request": {
+										"auth": {
+											"type": "apikey",
+											"apikey": [
+												{
+													"key": "key",
+													"value": "X-Api-Key",
+													"type": "string"
+												},
+												{
+													"key": "value",
+													"value": "{{apiKey}}",
+													"type": "string"
+												},
+												{
+													"key": "in",
+													"value": "header",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "multipart/form-data"
+											},
+											{
+												"key": "Accept",
+												"value": "*/*"
+											}
+										],
+										"body": {
+											"mode": "formdata",
+											"formdata": [
+												{
+													"key": "archivo",
+													"type": "file",
+													"src": "/home/naim/Mis archivos/[2] Facultad/[3] 2026 - 2° cuatrimestre /[1] Desarrollo de aplicaciones II/[1] Proyectos/proyecto_app/pruebas-vehiculos/Grupo_6_Etapa_1.pdf"
+												}
+											]
+										},
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/{{idCorolla}}/foto",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												"{{idCorolla}}",
+												"foto"
+											]
+										},
+										"description": "Multipart con el campo `archivo`: JPEG, PNG o WebP de hasta 2 MB. El tipo se detecta por el contenido, no por el nombre ni por el Content-Type del archivo."
+									},
+									"response": [
+										{
+											"name": "La unidad con su `fotoUrl`",
+											"originalRequest": {
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data"
+													},
+													{
+														"key": "Accept",
+														"value": "*/*"
+													},
+													{
+														"key": "X-Api-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "archivo",
+															"type": "file",
+															"src": []
+														}
+													]
+												},
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/foto",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"foto"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "text",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "*/*"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"id\": \"96594e45-58a1-bb98-a09a-d6d34b3d416d\",\n  \"marca\": \"string\",\n  \"modelo\": \"string\",\n  \"version\": null,\n  \"anio\": 5040,\n  \"kilometraje\": 4328,\n  \"precio\": 10000000,\n  \"disponible\": true,\n  \"caja\": \"MANUAL\",\n  \"fotoUrl\": null\n}"
+										},
+										{
+											"name": "Falta el campo `archivo` o el id no es UUID (SOLICITUD_INVALIDA)",
+											"originalRequest": {
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data"
+													},
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													},
+													{
+														"key": "X-Api-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "archivo",
+															"type": "file",
+															"src": []
+														}
+													]
+												},
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/foto",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"foto"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Bad Request",
+											"code": 400,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										},
+										{
+											"name": "Falta `X-Api-Key` o no es válida (CLAVE_SERVICIO_INVALIDA)",
+											"originalRequest": {
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data"
+													},
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													},
+													{
+														"key": "X-Api-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "archivo",
+															"type": "file",
+															"src": []
+														}
+													]
+												},
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/foto",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"foto"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Unauthorized",
+											"code": 401,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										},
+										{
+											"name": "No existe la unidad (VEHICULO_NO_ENCONTRADO)",
+											"originalRequest": {
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data"
+													},
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													},
+													{
+														"key": "X-Api-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "archivo",
+															"type": "file",
+															"src": []
+														}
+													]
+												},
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/foto",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"foto"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Not Found",
+											"code": 404,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										},
+										{
+											"name": "El cuerpo no es multipart/form-data (SOLICITUD_INVALIDA)",
+											"originalRequest": {
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data"
+													},
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													},
+													{
+														"key": "X-Api-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "archivo",
+															"type": "file",
+															"src": []
+														}
+													]
+												},
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/foto",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"foto"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Unsupported Media Type",
+											"code": 415,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										},
+										{
+											"name": "No es JPEG, PNG o WebP, está vacío o supera 2 MB (FOTO_INVALIDA)",
+											"originalRequest": {
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data"
+													},
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													},
+													{
+														"key": "X-Api-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "archivo",
+															"type": "file",
+															"src": []
+														}
+													]
+												},
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/foto",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"foto"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Unprocessable Entity (WebDAV) (RFC 4918)",
+											"code": 422,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										},
+										{
+											"name": "Error interno (ERROR_INTERNO)",
+											"originalRequest": {
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data"
+													},
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													},
+													{
+														"key": "X-Api-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "archivo",
+															"type": "file",
+															"src": []
+														}
+													]
+												},
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/foto",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"foto"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										},
+										{
+											"name": "Storage no responde, rechazó la subida o está deshabilitado (ALMACENAMIENTO_NO_DISPONIBLE)",
+											"originalRequest": {
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data"
+													},
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													},
+													{
+														"key": "X-Api-Key",
+														"value": "<API Key>",
+														"description": "Added as a part of security scheme: apikey"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "archivo",
+															"type": "file",
+															"src": []
+														}
+													]
+												},
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/foto",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"foto"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Service Unavailable",
+											"code": 503,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										}
+									]
+								}
+							]
+						},
+						{
+							"name": "precio",
+							"item": [
+								{
+									"name": "Precio actual de una unidad",
+									"request": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "*/*"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/{{idFicticio}}/precio",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												"{{idFicticio}}",
+												"precio"
+											]
+										},
+										"description": "Incluye `disponible`: responde 200 aunque la unidad ya no esté a la venta."
+									},
+									"response": [
+										{
+											"name": "Precio y disponibilidad",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "*/*"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/precio",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"precio"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "text",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "*/*"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"precio\": 10000000,\n  \"disponible\": true\n}"
+										},
+										{
+											"name": "El id no es un UUID (SOLICITUD_INVALIDA)",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/precio",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"precio"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Bad Request",
+											"code": 400,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										},
+										{
+											"name": "No existe la unidad (VEHICULO_NO_ENCONTRADO)",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/precio",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"precio"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Not Found",
+											"code": 404,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										},
+										{
+											"name": "Error interno (ERROR_INTERNO)",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/precio",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"precio"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										}
+									]
+								}
+							]
+						},
+						{
+							"name": "historial-precios",
+							"item": [
+								{
+									"name": "Historial de precios de una unidad",
+									"request": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "*/*"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/{{idFicticio}}/historial-precios",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												"{{idFicticio}}",
+												"historial-precios"
+											]
+										},
+										"description": "Del más nuevo al más viejo."
+									},
+									"response": [
+										{
+											"name": "Precios que rigieron",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "*/*"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/historial-precios",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"historial-precios"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "text",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "*/*"
+												}
+											],
+											"cookie": [],
+											"body": "[\n  {\n    \"precio\": 10000000,\n    \"vigenteDesde\": \"1997-03-02T04:23:29.559Z\"\n  },\n  {\n    \"precio\": 10000000,\n    \"vigenteDesde\": \"2011-06-15T21:26:34.364Z\"\n  }\n]"
+										},
+										{
+											"name": "El id no es un UUID (SOLICITUD_INVALIDA)",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/historial-precios",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"historial-precios"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Bad Request",
+											"code": 400,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										},
+										{
+											"name": "No existe la unidad (VEHICULO_NO_ENCONTRADO)",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/historial-precios",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"historial-precios"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Not Found",
+											"code": 404,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										},
+										{
+											"name": "Error interno (ERROR_INTERNO)",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Accept",
+														"value": "application/problem+json"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/vehiculos/:id/historial-precios",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"vehiculos",
+														":id",
+														"historial-precios"
+													],
+													"variable": [
+														{
+															"key": "id"
+														}
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/problem+json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+										}
+									]
+								}
+							]
+						},
+						{
+							"name": "Detalle de una unidad",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "*/*"
+									},
+									{
+										"key": "X-Correlation-Id",
+										"value": "e2e-001",
+										"type": "text",
+										"disabled": true
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/vehiculos/{{idCorolla}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"vehiculos",
+										"{{idCorolla}}"
+									]
+								},
+								"description": "Responde 200 aunque la unidad no esté disponible."
+							},
+							"response": [
+								{
+									"name": "La unidad",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "*/*"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/:id",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												":id"
+											],
+											"variable": [
+												{
+													"key": "id"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "text",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "*/*"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"id\": \"96594e45-58a1-bb98-a09a-d6d34b3d416d\",\n  \"marca\": \"string\",\n  \"modelo\": \"string\",\n  \"version\": null,\n  \"anio\": 5040,\n  \"kilometraje\": 4328,\n  \"precio\": 10000000,\n  \"disponible\": true,\n  \"caja\": \"MANUAL\",\n  \"fotoUrl\": null\n}"
+								},
+								{
+									"name": "El id no es un UUID (SOLICITUD_INVALIDA)",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/problem+json"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/:id",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												":id"
+											],
+											"variable": [
+												{
+													"key": "id"
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/problem+json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+								},
+								{
+									"name": "No existe la unidad (VEHICULO_NO_ENCONTRADO)",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/problem+json"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/:id",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												":id"
+											],
+											"variable": [
+												{
+													"key": "id"
+												}
+											]
+										}
+									},
+									"status": "Not Found",
+									"code": 404,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/problem+json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+								},
+								{
+									"name": "Error interno (ERROR_INTERNO)",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"key": "Accept",
+												"value": "application/problem+json"
+											}
+										],
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/:id",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												":id"
+											],
+											"variable": [
+												{
+													"key": "id"
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/problem+json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+								}
+							]
+						},
+						{
+							"name": "Cambia el precio y/o la disponibilidad",
+							"request": {
+								"auth": {
+									"type": "apikey",
+									"apikey": [
+										{
+											"key": "value",
+											"value": "{{apiKey}}",
+											"type": "string"
+										},
+										{
+											"key": "key",
+											"value": "X-Api-Key",
+											"type": "string"
+										},
+										{
+											"key": "in",
+											"value": "header",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "*/*"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"precio\": 1800000.00,\n  \"disponible\": true\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/vehiculos/{{idFicticio}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"vehiculos",
+										"{{idFicticio}}"
+									]
+								},
+								"description": "Al menos uno de los dos. Si cambia el precio, lo registra en el historial."
+							},
+							"response": [
+								{
+									"name": "La unidad actualizada",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "*/*"
+											},
+											{
+												"key": "X-Api-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"precio\": 10500000,\n  \"disponible\": null\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/:id",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												":id"
+											],
+											"variable": [
+												{
+													"key": "id"
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "text",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "*/*"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"id\": \"96594e45-58a1-bb98-a09a-d6d34b3d416d\",\n  \"marca\": \"string\",\n  \"modelo\": \"string\",\n  \"version\": null,\n  \"anio\": 5040,\n  \"kilometraje\": 4328,\n  \"precio\": 10000000,\n  \"disponible\": true,\n  \"caja\": \"MANUAL\",\n  \"fotoUrl\": null\n}"
+								},
+								{
+									"name": "JSON mal formado o id que no es UUID (JSON_INVALIDO, SOLICITUD_INVALIDA)",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/problem+json"
+											},
+											{
+												"key": "X-Api-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"precio\": 10500000,\n  \"disponible\": null\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/:id",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												":id"
+											],
+											"variable": [
+												{
+													"key": "id"
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/problem+json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+								},
+								{
+									"name": "Falta `X-Api-Key` o no es válida (CLAVE_SERVICIO_INVALIDA)",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/problem+json"
+											},
+											{
+												"key": "X-Api-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"precio\": 10500000,\n  \"disponible\": null\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/:id",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												":id"
+											],
+											"variable": [
+												{
+													"key": "id"
+												}
+											]
+										}
+									},
+									"status": "Unauthorized",
+									"code": 401,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/problem+json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+								},
+								{
+									"name": "No existe la unidad (VEHICULO_NO_ENCONTRADO)",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/problem+json"
+											},
+											{
+												"key": "X-Api-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"precio\": 10500000,\n  \"disponible\": null\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/:id",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												":id"
+											],
+											"variable": [
+												{
+													"key": "id"
+												}
+											]
+										}
+									},
+									"status": "Not Found",
+									"code": 404,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/problem+json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+								},
+								{
+									"name": "Datos inválidos o campos no admitidos (VALIDACION)",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/problem+json"
+											},
+											{
+												"key": "X-Api-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"precio\": 10500000,\n  \"disponible\": null\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/:id",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												":id"
+											],
+											"variable": [
+												{
+													"key": "id"
+												}
+											]
+										}
+									},
+									"status": "Unprocessable Entity (WebDAV) (RFC 4918)",
+									"code": 422,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/problem+json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+								},
+								{
+									"name": "Error interno (ERROR_INTERNO)",
+									"originalRequest": {
+										"method": "PUT",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/problem+json"
+											},
+											{
+												"key": "X-Api-Key",
+												"value": "<API Key>",
+												"description": "Added as a part of security scheme: apikey"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"precio\": 10500000,\n  \"disponible\": null\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/vehiculos/:id",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"vehiculos",
+												":id"
+											],
+											"variable": [
+												{
+													"key": "id"
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/problem+json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "Lista las unidades",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "*/*"
+							},
+							{
+								"key": "X-Correlation-Id",
+								"value": "e2e-001",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/vehiculos",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"vehiculos"
+							]
+						},
+						"description": "De la más nueva a la más vieja. Sin el parámetro devuelve todas."
+					},
+					"response": [
+						{
+							"name": "Unidades",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "*/*"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/vehiculos?disponible=false",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"vehiculos"
+									],
+									"query": [
+										{
+											"key": "disponible",
+											"value": "false",
+											"description": "Filtra por disponibilidad"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "text",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "*/*"
+								}
+							],
+							"cookie": [],
+							"body": "[\n  {\n    \"id\": \"dd678e8b-d1ec-9408-0227-b3d5e042df0e\",\n    \"marca\": \"string\",\n    \"modelo\": \"string\",\n    \"version\": null,\n    \"anio\": 5715,\n    \"kilometraje\": 4947,\n    \"precio\": 10000000,\n    \"disponible\": false,\n    \"caja\": \"MANUAL\",\n    \"fotoUrl\": null\n  },\n  {\n    \"id\": \"59942bd3-01ab-37c3-b2f8-4732565080f9\",\n    \"marca\": \"string\",\n    \"modelo\": \"string\",\n    \"version\": \"string\",\n    \"anio\": 8126,\n    \"kilometraje\": 3780,\n    \"precio\": 10000000,\n    \"disponible\": true,\n    \"caja\": \"MANUAL\",\n    \"fotoUrl\": null\n  }\n]"
+						},
+						{
+							"name": "`disponible` no es booleano (SOLICITUD_INVALIDA)",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/problem+json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/vehiculos?disponible=false",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"vehiculos"
+									],
+									"query": [
+										{
+											"key": "disponible",
+											"value": "false",
+											"description": "Filtra por disponibilidad"
+										}
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/problem+json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+						},
+						{
+							"name": "Error interno (ERROR_INTERNO)",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/problem+json"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/vehiculos?disponible=false",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"vehiculos"
+									],
+									"query": [
+										{
+											"key": "disponible",
+											"value": "false",
+											"description": "Filtra por disponibilidad"
+										}
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/problem+json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+						}
+					]
+				},
+				{
+					"name": "Da de alta una unidad",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"   if (pm.response.code === 201) {",
+									"     pm.environment.set(\"vehiculoId\", pm.response.json().id);",
+									"   }"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "apikey",
+							"apikey": [
+								{
+									"key": "value",
+									"value": "{{apiKey}}",
+									"type": "string"
+								},
+								{
+									"key": "key",
+									"value": "X-Api-Key",
+									"type": "string"
+								},
+								{
+									"key": "in",
+									"value": "header",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "*/*"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"marca\": \"Ficticia\",\n  \"modelo\": \"Prueba E2E\",\n  \"version\": \"Docker\",\n  \"anio\": 2026,\n  \"kilometraje\": 1000,\n  \"precio\": 10000000,\n  \"caja\": \"AUTOMATICA\"\n}",
+							"options": {
+								"raw": {
+									"headerFamily": "json",
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/vehiculos",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"vehiculos"
+							]
+						},
+						"description": "Registra también el precio inicial en el historial."
+					},
+					"response": [
+						{
+							"name": "La unidad creada, con su URL en `Location`",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "*/*"
+									},
+									{
+										"key": "X-Api-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"anio\": 2021,\n  \"caja\": \"MANUAL\",\n  \"kilometraje\": 45000,\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla\",\n  \"precio\": 10000000,\n  \"version\": \"XEI CVT\",\n  \"disponible\": true\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/vehiculos",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"vehiculos"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "text",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "*/*"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"id\": \"96594e45-58a1-bb98-a09a-d6d34b3d416d\",\n  \"marca\": \"string\",\n  \"modelo\": \"string\",\n  \"version\": null,\n  \"anio\": 5040,\n  \"kilometraje\": 4328,\n  \"precio\": 10000000,\n  \"disponible\": true,\n  \"caja\": \"MANUAL\",\n  \"fotoUrl\": null\n}"
+						},
+						{
+							"name": "JSON mal formado (JSON_INVALIDO)",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/problem+json"
+									},
+									{
+										"key": "X-Api-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"anio\": 2021,\n  \"caja\": \"MANUAL\",\n  \"kilometraje\": 45000,\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla\",\n  \"precio\": 10000000,\n  \"version\": \"XEI CVT\",\n  \"disponible\": true\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/vehiculos",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"vehiculos"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/problem+json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+						},
+						{
+							"name": "Falta `X-Api-Key` o no es válida (CLAVE_SERVICIO_INVALIDA)",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/problem+json"
+									},
+									{
+										"key": "X-Api-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"anio\": 2021,\n  \"caja\": \"MANUAL\",\n  \"kilometraje\": 45000,\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla\",\n  \"precio\": 10000000,\n  \"version\": \"XEI CVT\",\n  \"disponible\": true\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/vehiculos",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"vehiculos"
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/problem+json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+						},
+						{
+							"name": "Datos inválidos (VALIDACION)",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/problem+json"
+									},
+									{
+										"key": "X-Api-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"anio\": 2021,\n  \"caja\": \"MANUAL\",\n  \"kilometraje\": 45000,\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla\",\n  \"precio\": 10000000,\n  \"version\": \"XEI CVT\",\n  \"disponible\": true\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/vehiculos",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"vehiculos"
+									]
+								}
+							},
+							"status": "Unprocessable Entity (WebDAV) (RFC 4918)",
+							"code": 422,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/problem+json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+						},
+						{
+							"name": "Error interno (ERROR_INTERNO)",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/problem+json"
+									},
+									{
+										"key": "X-Api-Key",
+										"value": "<API Key>",
+										"description": "Added as a part of security scheme: apikey"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"anio\": 2021,\n  \"caja\": \"MANUAL\",\n  \"kilometraje\": 45000,\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla\",\n  \"precio\": 10000000,\n  \"version\": \"XEI CVT\",\n  \"disponible\": true\n}",
+									"options": {
+										"raw": {
+											"headerFamily": "json",
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/vehiculos",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"vehiculos"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/problem+json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"type\": \"http://JlSrqtmEVYYtcXfeuuTvd.optjPkUsfCYewbHKfuve,fWR+S\",\n  \"title\": \"string\",\n  \"status\": 1463,\n  \"detail\": \"string\",\n  \"instance\": \"https://ggeTCspoMlwUOqKeZfNH.ojyFUwp\",\n  \"properties\": null\n}"
+						}
+					]
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "apikey",
+		"apikey": [
+			{
+				"key": "value",
+				"value": "{{apiKey}}",
+				"type": "string"
+			},
+			{
+				"key": "key",
+				"value": "X-Api-Key",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8083"
+		}
+	]
+}

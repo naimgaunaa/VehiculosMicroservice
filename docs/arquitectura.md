@@ -800,6 +800,21 @@ Decisiones de la etapa 8 que las etapas siguientes deben respetar:
 - `restart: on-failure:3`: si Supabase está pausado o falta una variable, la app termina al arrancar y no queda en un bucle infinito. Docker no reinicia un contenedor `unhealthy` (eso es solo de Swarm).
 - Las 6 variables obligatorias van con `${VAR:?mensaje}`, que también rechaza un valor vacío. Un `.env` copiado de `.env.example` sin completar falla por `VEHICULOS_DB_CLAVE`.
 
+### Pendientes que dejó la etapa 9 (punta a punta)
+
+En la prueba con Postman sobre el contenedor falló E7 (`PUT /vehiculos/{id}/foto` con Body *raw* JSON): dio 500 `ERROR_INTERNO` en vez de 415. Causa: la colección importada de `/v3/api-docs` trae un header explícito `Content-Type: multipart/form-data`, y Postman lo conserva al pasar el Body a *raw*. El pedido llegaba como multipart sin boundary, pasaba el `consumes` y el interceptor, y con `resolve-lazily` Tomcat fallaba al parsear (`no multipart boundary was found`) al resolver el argumento. La `MultipartException` no tenía mapeo y caía en `ERROR_INTERNO`. Está hecho: `ApiExceptionHandler` mapea `MultipartException`, se sacó `consumes` del mapping y el body de OpenAPI se declara a mano. `verify` pasa en Testcontainers (350 tests); no se corrió `-Psupabase`. Se probó con `curl` contra el contenedor el 2026-10-11: E5 422, E6 400, E7 con `application/json` 415, E7 con multipart sin boundary 400, E7 sin clave 401, E8 404 y B5 401, sin `ERROR` en los logs. Lo que quedó:
+
+- **E7 del paso a paso:** con el header `Content-Type: multipart/form-data` de la colección, la respuesta correcta es 400 `SOLICITUD_INVALIDA` (multipart mal formado), no 415. El 415 sale solo destildando ese header, así llega `application/json`. Corregir la consigna de E7 y sumar un caso aparte para el multipart mal formado.
+- **Repetir E7 en Postman** con las dos variantes (header destildado: 415; header puesto: 400) y E1 después de reimportar `/v3/api-docs`, para confirmar que la subida sigue funcionando con la documentación nueva.
+
+Decisiones de la etapa 9 que las etapas siguientes deben respetar:
+
+- `PUT /vehiculos/{id}/foto` no declara `consumes`, igual que las otras escrituras. Con `consumes`, el 415 salía al buscar el handler, antes del interceptor, y un pedido sin clave y sin multipart daba 415 en vez de 401.
+- El 415 y el 400 del multipart los arma `ApiExceptionHandler` a partir de `MultipartException`. Si el `Content-Type` no empieza con `multipart/`, responde 415 `SOLICITUD_INVALIDA` con `Accept: multipart/form-data`; si no, 400 `SOLICITUD_INVALIDA`. `MaxUploadSizeExceededException` sigue en 422 `FOTO_INVALIDA` porque su handler es más específico.
+- Orden de errores del `PUT` de foto: 401 → 415/400 → 404 → 422 → 503. El cuerpo se lee al resolver el argumento, antes de buscar la unidad.
+- El body de OpenAPI va en `@Operation(requestBody = ...)` como `multipart/form-data` con `archivo` binario y obligatorio, y el parámetro lleva `@Parameter(hidden = true)`. Sin `consumes`, springdoc lo documenta como `application/json`, y si solo se agrega el `requestBody` lista los dos media types. `VehiculoEscrituraApiTest.laDocumentacionDeLaFotoPideMultipart` lo cubre.
+- Los casos de multipart mal formado se prueban en `FotoApiTest`, con el servidor real.
+
 ---
 
 ## 14. Tecnologías y dependencias

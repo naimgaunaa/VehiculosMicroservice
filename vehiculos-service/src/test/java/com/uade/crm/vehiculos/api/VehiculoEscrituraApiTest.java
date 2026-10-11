@@ -185,6 +185,16 @@ class VehiculoEscrituraApiTest {
                         .doesNotExist());
     }
 
+    @Test
+    void laDocumentacionDeLaFotoPideMultipart() throws Exception {
+        mvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/vehiculos/{id}/foto'].put.requestBody.content['multipart/form-data']"
+                        + ".schema.properties.archivo").exists())
+                .andExpect(jsonPath("$.paths['/vehiculos/{id}/foto'].put.requestBody.content['application/json']")
+                        .doesNotExist());
+    }
+
     private String crear(String precio) throws Exception {
         String cuerpo = mvc.perform(post("/vehiculos").header("X-Api-Key", CLAVE)
                         .contentType(MediaType.APPLICATION_JSON)

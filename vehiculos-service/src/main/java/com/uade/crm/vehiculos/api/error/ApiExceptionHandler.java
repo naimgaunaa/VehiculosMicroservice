@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -19,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -35,6 +37,7 @@ import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import com.uade.crm.vehiculos.api.seguridad.ClaveServicioInvalidaException;
@@ -130,6 +133,20 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         }
         log.error("Error al procesar {}", ruta(request), ex);
         return responder(CodigoError.ERROR_INTERNO, statusCode, DETALLE_INTERNO, headers, request, null);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<Object> handleMultipart(MultipartException ex, WebRequest request) {
+        String tipo = request instanceof ServletWebRequest web ? web.getRequest().getContentType() : null;
+        if (tipo == null || !tipo.toLowerCase(Locale.ROOT).startsWith("multipart/")) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setAccept(List.of(MediaType.MULTIPART_FORM_DATA));
+            return responder(CodigoError.SOLICITUD_INVALIDA, HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                    "El cuerpo debe ser multipart/form-data", headers, request, null);
+        }
+        log.debug("Multipart ilegible: {}", ex.getMessage());
+        return responder(CodigoError.SOLICITUD_INVALIDA, HttpStatus.BAD_REQUEST,
+                "El cuerpo multipart está mal formado", null, request, null);
     }
 
     @ExceptionHandler(VehiculoNoEncontradoException.class)
