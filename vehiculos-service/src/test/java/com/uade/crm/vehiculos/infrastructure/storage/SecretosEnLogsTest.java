@@ -155,6 +155,7 @@ class SecretosEnLogsTest {
     @Test
     void unaFallaDelBorradoSeLogueaSinLasClaves(CapturedOutput salida) throws Exception {
         when(repositorio.buscarPorId(ID)).thenReturn(Optional.of(unidad(PUBLICA_PNG)));
+        when(repositorio.buscarPorIdParaActualizar(ID)).thenReturn(Optional.of(unidad(PUBLICA_PNG)));
         when(repositorio.guardar(any()))
                 .thenAnswer(invocacion -> invocacion.getArgument(0));
         storage.expect(requestTo(OBJETOS + "/" + ID + ".jpg")).andRespond(withSuccess());

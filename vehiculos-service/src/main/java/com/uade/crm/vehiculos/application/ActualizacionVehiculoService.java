@@ -26,7 +26,8 @@ public class ActualizacionVehiculoService {
 
     @Transactional
     public Vehiculo actualizar(UUID id, BigDecimal precio, Boolean disponible) {
-        Vehiculo vehiculo = repositorio.buscarPorId(id).orElseThrow(() -> new VehiculoNoEncontradoException(id));
+        Vehiculo vehiculo = repositorio.buscarPorIdParaActualizar(id)
+                .orElseThrow(() -> new VehiculoNoEncontradoException(id));
         BigDecimal precioAnterior = vehiculo.precio();
         boolean disponibleAnterior = vehiculo.disponible();
         if (precio != null) {

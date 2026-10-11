@@ -17,8 +17,11 @@ spring:
       max-request-size: 3MB
       resolve-lazily: true
   jackson:
+    mapper:
+      allow-coercion-of-scalars: false
     deserialization:
       fail-on-unknown-properties: true
+      accept-float-as-int: false
   jpa:
     open-in-view: false
     hibernate:
@@ -35,7 +38,7 @@ spring:
     # *:future es el valor por defecto de Flyway y hay que repetirlo porque esta lista lo reemplaza.
     ignore-migration-patterns: "*:future,repeatable:missing"
 
-# Sin valor por defecto: si falta una variable, Spring falla con "Could not resolve placeholder".
+# Sin valor por defecto: si falta una variable, el binding recibe el texto literal ${VAR} y VehiculosProperties lo rechaza.
 # Las de Supabase pueden quedar vacías en modo deshabilitado; VehiculosProperties las exige en modo supabase.
 vehiculos:
   modo-fotos: ${VEHICULOS_FOTOS_MODO}

@@ -15,6 +15,7 @@ import java.time.Instant;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,6 +51,7 @@ class VehiculoEscrituraApiTest {
     @Autowired
     private RelojDePrueba reloj;
 
+    @BeforeEach
     @AfterEach
     void reiniciarReloj() {
         reloj.reiniciar();

@@ -219,6 +219,28 @@ class VehiculoControllerEscrituraTest {
         verifyNoInteractions(alta);
     }
 
+    static Stream<Arguments> altasConUnValorDeOtroTipo() {
+        return Stream.of(
+                Arguments.of("anio", new BigDecimal("2021.9")),
+                Arguments.of("kilometraje", new BigDecimal("45000.7")),
+                Arguments.of("anio", "2021"),
+                Arguments.of("kilometraje", "45000"),
+                Arguments.of("disponible", "false"));
+    }
+
+    @ParameterizedTest(name = "{0} = {1}")
+    @MethodSource("altasConUnValorDeOtroTipo")
+    void altaConUnValorDeOtroTipoResponde422ConEseCampo(String campo, Object valor) throws Exception {
+        Map<String, Object> cuerpo = altaValida();
+        cuerpo.put(campo, valor);
+
+        validacion(mvc.perform(alta(cuerpo)))
+                .andExpect(jsonPath("$.errores.length()").value(1))
+                .andExpect(jsonPath("$.errores[0].campo").value(campo))
+                .andExpect(jsonPath("$.errores[0].mensaje").value("el valor no tiene el tipo esperado"));
+        verifyNoInteractions(alta);
+    }
+
     @Test
     void altaConJsonMalFormadoResponde400() throws Exception {
         mvc.perform(alta("{\"marca\":"))
@@ -288,6 +310,15 @@ class VehiculoControllerEscrituraTest {
                 .andExpect(jsonPath("$.errores.length()").value(1))
                 .andExpect(jsonPath("$.errores[0].campo").value(campo))
                 .andExpect(jsonPath("$.errores[0].mensaje").value("campo no admitido"));
+        verifyNoInteractions(actualizacion);
+    }
+
+    @Test
+    void actualizacionConDisponibleComoTextoResponde422() throws Exception {
+        validacion(mvc.perform(actualizacion("{\"disponible\":\"false\"}")))
+                .andExpect(jsonPath("$.errores.length()").value(1))
+                .andExpect(jsonPath("$.errores[0].campo").value("disponible"))
+                .andExpect(jsonPath("$.errores[0].mensaje").value("el valor no tiene el tipo esperado"));
         verifyNoInteractions(actualizacion);
     }
 

@@ -315,6 +315,24 @@ class VehiculoRepositorioJpaTest {
         assertThat(repositorio.historialDePrecios(UUID.randomUUID())).isEmpty();
     }
 
+    @Test
+    void buscarParaActualizarLeeLaUnidadGuardada() {
+        Vehiculo vehiculo = unVehiculo().build();
+        repositorio.guardar(vehiculo);
+        sincronizar();
+
+        assertThat(repositorio.buscarPorIdParaActualizar(vehiculo.id()))
+                .hasValueSatisfying(leido -> assertThat(leido.precio()).isEqualByComparingTo(vehiculo.precio()));
+        assertThat(repositorio.buscarPorIdParaActualizar(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void buscarParaActualizarFueraDeUnaTransaccionFalla() {
+        assertThatThrownBy(() -> repositorio.buscarPorIdParaActualizar(UUID.randomUUID()))
+                .isInstanceOf(IllegalTransactionStateException.class);
+    }
+
     /** Sin la transacción del test: el caso de uso que se olvide de abrir una falla en vez de commitear a medias. */
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
