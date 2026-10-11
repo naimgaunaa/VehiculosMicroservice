@@ -3,6 +3,7 @@ package com.uade.crm.vehiculos.api;
 import static com.uade.crm.vehiculos.FotosDePrueba.png;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -96,6 +97,49 @@ class FotoApiTest {
         assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(json.readTree(respuesta.getBody()).get("codigo").asText()).isEqualTo("CLAVE_SERVICIO_INVALIDA");
         assertThat(storage.objetos()).isEmpty();
+    }
+
+    @Test
+    void sinClaveYCuerpoQueNoEsMultipartResponde401() throws Exception {
+        ResponseEntity<String> respuesta = enviar(MediaType.APPLICATION_JSON, null);
+
+        rechazado(respuesta, HttpStatus.UNAUTHORIZED, "CLAVE_SERVICIO_INVALIDA");
+    }
+
+    @Test
+    void conClaveYCuerpoJsonResponde415() throws Exception {
+        ResponseEntity<String> respuesta = enviar(MediaType.APPLICATION_JSON, CLAVE);
+
+        rechazado(respuesta, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "SOLICITUD_INVALIDA");
+    }
+
+    @Test
+    void conClaveYMultipartSinBoundaryResponde400() throws Exception {
+        ResponseEntity<String> respuesta = enviar(MediaType.MULTIPART_FORM_DATA, CLAVE);
+
+        rechazado(respuesta, HttpStatus.BAD_REQUEST, "SOLICITUD_INVALIDA");
+    }
+
+    private void rechazado(ResponseEntity<String> respuesta, HttpStatus status, String codigo) throws Exception {
+        assertThat(respuesta.getStatusCode()).isEqualTo(status);
+        assertThat(respuesta.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+        JsonNode cuerpo = json.readTree(respuesta.getBody());
+        assertThat(cuerpo.get("codigo").asText()).isEqualTo(codigo);
+        assertThat(cuerpo.get("correlationId").asText()).isNotBlank();
+        assertThat(storage.objetos()).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT foto_url FROM " + schema + ".vehiculo WHERE id = ?::uuid",
+                String.class, ID)).isNull();
+    }
+
+    private ResponseEntity<String> enviar(MediaType tipo, String clave) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(tipo);
+        if (clave != null) {
+            headers.set("X-Api-Key", clave);
+        }
+        byte[] cuerpo = "{\"archivo\":\"auto.png\"}".getBytes(StandardCharsets.UTF_8);
+        return http.exchange("/vehiculos/{id}/foto", HttpMethod.PUT, new HttpEntity<>(cuerpo, headers),
+                String.class, ID);
     }
 
     private void fotoInvalida(ResponseEntity<String> respuesta) throws Exception {

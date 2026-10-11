@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.SchemaProperty;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -156,14 +157,20 @@ public class VehiculoController {
         return VehiculoResponse.de(actualizacion.actualizar(id, pedido.precio(), pedido.disponible()));
     }
 
-    @PutMapping(value = "/{id}/foto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PutMapping("/{id}/foto")
     @RequiereClaveServicio
     @SecurityRequirement(name = OpenApiConfig.ESQUEMA_CLAVE_SERVICIO)
     @Operation(summary = "Carga o reemplaza la foto de una unidad",
             description = "Multipart con el campo `archivo`: JPEG, PNG o WebP de hasta 2 MB. El tipo se detecta por "
-                    + "el contenido, no por el nombre ni por el Content-Type del archivo.")
+                    + "el contenido, no por el nombre ni por el Content-Type del archivo.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+                    content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                            schema = @Schema(type = "object", requiredProperties = "archivo"),
+                            schemaProperties = @SchemaProperty(name = "archivo",
+                                    schema = @Schema(type = "string", format = "binary")))))
     @ApiResponse(responseCode = "200", description = "La unidad con su `fotoUrl`")
-    @ApiResponse(responseCode = "400", description = "Falta el campo `archivo` o el id no es UUID (SOLICITUD_INVALIDA)",
+    @ApiResponse(responseCode = "400", description = "Falta el campo `archivo`, el multipart está mal formado o el id "
+            + "no es UUID (SOLICITUD_INVALIDA)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "401", description = "Falta `X-Api-Key` o no es válida (CLAVE_SERVICIO_INVALIDA)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
@@ -178,7 +185,8 @@ public class VehiculoController {
     @ApiResponse(responseCode = "503", description = "Storage no responde, rechazó la subida o está deshabilitado "
             + "(ALMACENAMIENTO_NO_DISPONIBLE)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
-    public VehiculoResponse asignarFoto(@PathVariable UUID id, @RequestParam("archivo") MultipartFile archivo)
+    public VehiculoResponse asignarFoto(@PathVariable UUID id,
+            @Parameter(hidden = true) @RequestParam("archivo") MultipartFile archivo)
             throws IOException {
         return VehiculoResponse.de(fotos.asignar(id, archivo.getBytes()));
     }
