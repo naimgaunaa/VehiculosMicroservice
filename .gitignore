@@ -8,3 +8,5 @@ target/
 .agents
 .claude
 CLAUDE.md
+fotos/
+.env.VehiculosMicroservice
