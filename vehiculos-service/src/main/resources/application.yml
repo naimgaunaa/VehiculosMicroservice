@@ -22,6 +22,14 @@ spring:
     deserialization:
       fail-on-unknown-properties: true
       accept-float-as-int: false
+  # Pool mínimo para una sola instancia (la URL/credenciales vienen del perfil activo).
+  datasource:
+    hikari:
+      minimum-idle: 1
+      maximum-pool-size: 2
+      connection-timeout: 5000
+      idle-timeout: 30000
+      max-lifetime: 300000
   jpa:
     open-in-view: false
     hibernate:
