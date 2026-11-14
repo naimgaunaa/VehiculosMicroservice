@@ -28,7 +28,7 @@ Las pasa el responsable de `vehiculos` (Naim Gauna), **solo por mensaje directo 
 
 | Querés… | Tenés que pedir |
 |---|---|
-| Correr los tests (`mvn verify`) | **Nada.** Los tests levantan su propio PostgreSQL con Docker |
+| Correr los tests (`./mvnw verify`) | **Nada.** Los tests levantan su propio PostgreSQL con Docker |
 | Consumir la API de un `vehiculos` que ya está corriendo (desde `calificacion`, el front o el gateway) | **Nada** para leer. La `X-Api-Key` solo si vas a dar de alta o modificar unidades |
 | Levantar el servicio en tu máquina | Las 3 claves de la base: `VEHICULOS_DB_URL`, `VEHICULOS_DB_USUARIO` y `VEHICULOS_DB_CLAVE` |
 | Además, subir fotos | También `VEHICULOS_SUPABASE_URL` y `VEHICULOS_SUPABASE_CLAVE_SECRETA` |
@@ -64,7 +64,8 @@ Las pasa el responsable de `vehiculos` (Naim Gauna), **solo por mensaje directo 
 | Git | Clonar el repo | `git --version` |
 | Docker Desktop (o Docker Engine con Compose v2) | Correr con Docker y correr los tests | `docker compose version` |
 | JDK 21 | Solo para correr con Maven o correr los tests | `java -version` |
-| Maven 3.9 o superior | Solo para correr con Maven o correr los tests. El repo no trae `mvnw` | `mvn -v` |
+
+**No hace falta instalar Maven:** el repo trae el Maven Wrapper (`mvnw` en Linux, macOS y Git Bash; `mvnw.cmd` en Windows). La primera vez descarga Maven 3.9.16 en `~/.m2/wrapper`, verificando su SHA-256, y después lo reusa. La versión se define en `.mvn/wrapper/maven-wrapper.properties`. Si ya tenés Maven instalado, `mvn` también funciona.
 
 Con el camino de Docker no necesitás Java ni Maven: el `Dockerfile` compila dentro del contenedor.
 
@@ -159,7 +160,7 @@ El contenedor siempre usa el perfil `docker` y **nunca** carga datos de prueba e
 
 ## 4. Paso a paso con Maven, sin Docker
 
-Sirve para correr el servicio desde el IDE o la terminal. Necesitás JDK 21 y Maven.
+Sirve para correr el servicio desde el IDE o la terminal. Necesitás JDK 21 (Maven lo trae el wrapper).
 
 ### Paso 1. Crear y completar `infra/.env`
 
@@ -197,8 +198,10 @@ Las variables quedan cargadas solo en esa terminal. Si abrís otra, hay que volv
 En **la misma** terminal:
 
 ```bash
-mvn -pl vehiculos-service spring-boot:run
+./mvnw -pl vehiculos-service spring-boot:run
 ```
+
+En PowerShell: `.\mvnw.cmd -pl vehiculos-service spring-boot:run`.
 
 Usa el perfil `local`, que es el que viene por defecto. Está listo cuando aparece `Started VehiculosApplication`. Para frenarlo, `Ctrl+C`.
 
@@ -270,10 +273,10 @@ Usa el perfil `local`, que es el que viene por defecto. Está listo cuando apare
 
 ## 6. Correr los tests
 
-Necesitás JDK 21, Maven y **Docker abierto**. No hace falta ninguna clave: los tests de integración levantan su propio PostgreSQL con Testcontainers y no tocan Supabase.
+Necesitás JDK 21 y **Docker abierto**. No hace falta ninguna clave: los tests de integración levantan su propio PostgreSQL con Testcontainers y no tocan Supabase.
 
 ```bash
-mvn -pl vehiculos-service -am verify
+./mvnw -pl vehiculos-service -am verify
 ```
 
 Tiene que terminar en `BUILD SUCCESS`. La primera vez descarga la imagen `postgres:17-alpine`.
@@ -281,7 +284,7 @@ Tiene que terminar en `BUILD SUCCESS`. La primera vez descarga la imagen `postgr
 También hay una suite opcional que corre los mismos tests contra Supabase, en el schema `vehiculos_test`, nunca en `vehiculos`. Necesita las claves de la base cargadas en la terminal (sección 4, paso 2):
 
 ```bash
-mvn -pl vehiculos-service -am verify -Psupabase
+./mvnw -pl vehiculos-service -am verify -Psupabase
 ```
 
 ---
