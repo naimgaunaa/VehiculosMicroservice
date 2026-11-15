@@ -5,7 +5,7 @@
 -- Es idempotente (ids fijos + ON CONFLICT DO NOTHING): no duplica filas, pero tampoco actualiza las ya cargadas.
 -- Para cambiar un dato ya sembrado hay que borrar la fila a mano (primero precio_historial, después vehiculo).
 --
--- Los datos son ficticios. fotos: todas en NULL. creado_en = actualizado_en = vigente_desde de la fila inicial.
+-- Los datos son ficticios. fotos: todas en NULL. Cada unidad tiene patente (UPDATE del final). creado_en = actualizado_en = vigente_desde de la fila inicial.
 
 INSERT INTO vehiculo (id, marca, modelo, version, anio, kilometraje, precio, disponible, caja, foto_url, creado_en, actualizado_en)
 VALUES
@@ -35,3 +35,25 @@ VALUES
     ('b0000000-0000-4000-8000-000000000009', 'a0000000-0000-4000-8000-000000000009', 31500000.00, '2026-09-09T10:00:00Z'),
     ('b0000000-0000-4000-8000-000000000010', 'a0000000-0000-4000-8000-000000000010',  8900000.00, '2026-09-10T10:00:00Z')
 ON CONFLICT (id) DO NOTHING;
+
+-- Patentes de prueba (necesitan la V2). Solo completa las que están en NULL: no pisa una patente cargada a mano.
+-- AAA111 es la patente de prueba que tiene actas reales en la ANSV (sirve para ver el flujo de multas completo).
+-- El resto se eligió para no coincidir con autos reales: series Mercosur que todavía no se emiten (Z...) y del
+-- formato anterior por encima de las emitidas. ZZZ000 y XYZ123 son las que usan las pruebas en vivo del scraper
+-- como patentes sin actas.
+UPDATE vehiculo AS v
+SET patente = s.patente
+FROM (VALUES
+    ('a0000000-0000-4000-8000-000000000001', 'AAA111'),
+    ('a0000000-0000-4000-8000-000000000002', 'ZZZ000'),
+    ('a0000000-0000-4000-8000-000000000003', 'ZA123BC'),
+    ('a0000000-0000-4000-8000-000000000004', 'XYZ123'),
+    ('a0000000-0000-4000-8000-000000000005', 'ZB456CD'),
+    ('a0000000-0000-4000-8000-000000000006', 'WVU321'),
+    ('a0000000-0000-4000-8000-000000000007', 'ZC789DE'),
+    ('a0000000-0000-4000-8000-000000000008', 'TSR654'),
+    ('a0000000-0000-4000-8000-000000000009', 'ZD012EF'),
+    ('a0000000-0000-4000-8000-000000000010', 'YXW987')
+) AS s (id, patente)
+WHERE v.id = s.id::uuid
+  AND v.patente IS NULL;
