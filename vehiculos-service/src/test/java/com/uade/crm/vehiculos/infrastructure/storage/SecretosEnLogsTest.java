@@ -59,6 +59,7 @@ import com.uade.crm.vehiculos.application.ActualizacionVehiculoService;
 import com.uade.crm.vehiculos.application.AltaVehiculoService;
 import com.uade.crm.vehiculos.application.ConsultaVehiculoService;
 import com.uade.crm.vehiculos.application.FotoVehiculoService;
+import com.uade.crm.vehiculos.application.MultasVehiculoService;
 import com.uade.crm.vehiculos.domain.model.Caja;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
 import com.uade.crm.vehiculos.domain.port.FotoStorage;
@@ -95,6 +96,9 @@ class SecretosEnLogsTest {
 
     @MockitoBean
     private ActualizacionVehiculoService actualizacion;
+
+    @MockitoBean
+    private MultasVehiculoService multasVehiculo;
 
     @TestConfiguration
     static class StorageContraServidorFalso {

@@ -39,8 +39,8 @@ class SeedTest {
         List<Map<String, Object>> aplicadas = jdbc.queryForList(
                 "SELECT version, script FROM " + schema + ".flyway_schema_history WHERE success AND type = 'SQL' ORDER BY installed_rank");
 
-        assertThat(aplicadas).extracting(fila -> fila.get("version")).containsExactly("1", null);
-        assertThat(aplicadas.get(1).get("script")).isEqualTo("R__seed_vehiculos.sql");
+        assertThat(aplicadas).extracting(fila -> fila.get("version")).containsExactly("1", "2", null);
+        assertThat(aplicadas.get(2).get("script")).isEqualTo("R__seed_vehiculos.sql");
     }
 
     @Test
@@ -82,6 +82,41 @@ class SeedTest {
             assertThat(historial).as("historial de %s %s", vehiculo.marca(), vehiculo.modelo()).hasSize(1);
             assertThat(historial.get(0).precio()).isEqualByComparingTo(vehiculo.precio());
         }
+    }
+
+    @Test
+    void cadaUnidadTieneUnaPatenteValidaYDistinta() {
+        List<Vehiculo> todos = repositorio.buscar(null);
+
+        assertThat(todos).allMatch(v -> v.patente().isPresent());
+        assertThat(todos).extracting(v -> v.patente().orElseThrow()).doesNotHaveDuplicates()
+                .allMatch(p -> p.equals(com.uade.crm.vehiculos.domain.model.Patente.normalizar(p)));
+    }
+
+    @Test
+    void laUnidadDePruebaDeMultasTieneLaPatenteAAA111YEstaDisponible() {
+        assertThat(repositorio.buscar(true)).anyMatch(v -> v.patente().filter("AAA111"::equals).isPresent());
+    }
+
+    @Test
+    void hayPatentesDeLosDosFormatos() {
+        List<String> patentes = repositorio.buscar(null).stream().map(v -> v.patente().orElseThrow()).toList();
+
+        assertThat(patentes).anyMatch(p -> p.matches("[A-Z]{3}[0-9]{3}")).anyMatch(p -> p.matches("[A-Z]{2}[0-9]{3}[A-Z]{2}"));
+    }
+
+    @Test
+    void lasPatentesNoPisanUnaCargadaAMano() throws Exception {
+        jdbc.update("UPDATE " + schema + ".vehiculo SET patente = 'QQ111QQ' WHERE id = 'a0000000-0000-4000-8000-000000000002'::uuid");
+
+        jdbc.execute((java.sql.Connection conexion) -> {
+            conexion.createStatement().execute("SET LOCAL search_path TO " + schema);
+            ScriptUtils.executeSqlScript(conexion, new ClassPathResource("db/seed/R__seed_vehiculos.sql"));
+            return null;
+        });
+
+        assertThat(jdbc.queryForObject("SELECT patente FROM " + schema + ".vehiculo WHERE id = 'a0000000-0000-4000-8000-000000000002'::uuid",
+                String.class)).isEqualTo("QQ111QQ");
     }
 
     @Test

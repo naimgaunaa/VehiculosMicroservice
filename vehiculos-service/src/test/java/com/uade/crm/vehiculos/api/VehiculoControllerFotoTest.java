@@ -30,6 +30,7 @@ import com.uade.crm.vehiculos.application.ActualizacionVehiculoService;
 import com.uade.crm.vehiculos.application.AltaVehiculoService;
 import com.uade.crm.vehiculos.application.ConsultaVehiculoService;
 import com.uade.crm.vehiculos.application.FotoVehiculoService;
+import com.uade.crm.vehiculos.application.MultasVehiculoService;
 import com.uade.crm.vehiculos.domain.model.AlmacenamientoNoDisponibleException;
 import com.uade.crm.vehiculos.domain.model.Caja;
 import com.uade.crm.vehiculos.domain.model.FotoInvalidaException;
@@ -59,6 +60,9 @@ class VehiculoControllerFotoTest {
 
     @MockitoBean
     private FotoVehiculoService fotos;
+
+    @MockitoBean
+    private MultasVehiculoService multasVehiculo;
 
     @Test
     void unaFotoValidaResponde200ConLaUnidadYPasaLosBytesAlServicio() throws Exception {

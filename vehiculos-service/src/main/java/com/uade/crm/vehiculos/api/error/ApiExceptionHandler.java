@@ -45,6 +45,8 @@ import com.uade.crm.vehiculos.application.DatosInvalidosException;
 import com.uade.crm.vehiculos.config.CorrelationIdFilter;
 import com.uade.crm.vehiculos.domain.model.AlmacenamientoNoDisponibleException;
 import com.uade.crm.vehiculos.domain.model.FotoInvalidaException;
+import com.uade.crm.vehiculos.domain.model.PatenteDuplicadaException;
+import com.uade.crm.vehiculos.domain.model.PatenteNoCoincideException;
 import com.uade.crm.vehiculos.domain.model.VehiculoNoEncontradoException;
 
 /**
@@ -167,6 +169,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(FotoInvalidaException.class)
     public ResponseEntity<Object> handleFotoInvalida(FotoInvalidaException ex, WebRequest request) {
         return responder(CodigoError.FOTO_INVALIDA, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(PatenteDuplicadaException.class)
+    public ResponseEntity<Object> handlePatenteDuplicada(PatenteDuplicadaException ex, WebRequest request) {
+        return responder(CodigoError.PATENTE_DUPLICADA, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(PatenteNoCoincideException.class)
+    public ResponseEntity<Object> handlePatenteNoCoincide(PatenteNoCoincideException ex, WebRequest request) {
+        return responder(CodigoError.PATENTE_NO_COINCIDE, ex.getMessage(), request);
     }
 
     @ExceptionHandler(AlmacenamientoNoDisponibleException.class)

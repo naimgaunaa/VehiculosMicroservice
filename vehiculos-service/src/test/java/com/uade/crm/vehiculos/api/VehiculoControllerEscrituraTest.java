@@ -40,6 +40,7 @@ import com.uade.crm.vehiculos.application.AltaVehiculo;
 import com.uade.crm.vehiculos.application.AltaVehiculoService;
 import com.uade.crm.vehiculos.application.ConsultaVehiculoService;
 import com.uade.crm.vehiculos.application.FotoVehiculoService;
+import com.uade.crm.vehiculos.application.MultasVehiculoService;
 import com.uade.crm.vehiculos.application.DatosInvalidosException;
 import com.uade.crm.vehiculos.domain.model.Caja;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
@@ -69,6 +70,9 @@ class VehiculoControllerEscrituraTest {
 
     @MockitoBean
     private FotoVehiculoService fotos;
+
+    @MockitoBean
+    private MultasVehiculoService multasVehiculo;
 
     @Test
     void altaValidaResponde201ConLocationYLaUnidad() throws Exception {
@@ -260,28 +264,28 @@ class VehiculoControllerEscrituraTest {
 
     @Test
     void actualizacionDelPrecioPasaSoloElPrecio() throws Exception {
-        when(actualizacion.actualizar(ID, new BigDecimal("10500000"), null)).thenReturn(corolla());
+        when(actualizacion.actualizar(ID, new BigDecimal("10500000"), null, null)).thenReturn(corolla());
 
         mvc.perform(actualizacion("{\"precio\":10500000}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(ID.toString()));
-        verify(actualizacion).actualizar(ID, new BigDecimal("10500000"), null);
+        verify(actualizacion).actualizar(ID, new BigDecimal("10500000"), null, null);
     }
 
     @Test
     void actualizacionDeLaDisponibilidadPasaSoloLaDisponibilidad() throws Exception {
-        when(actualizacion.actualizar(ID, null, false)).thenReturn(corolla());
+        when(actualizacion.actualizar(ID, null, false, null)).thenReturn(corolla());
 
         mvc.perform(actualizacion("{\"disponible\":false}")).andExpect(status().isOk());
-        verify(actualizacion).actualizar(ID, null, false);
+        verify(actualizacion).actualizar(ID, null, false, null);
     }
 
     @Test
     void actualizacionDeAmbosPasaAmbos() throws Exception {
-        when(actualizacion.actualizar(ID, new BigDecimal("10500000.50"), true)).thenReturn(corolla());
+        when(actualizacion.actualizar(ID, new BigDecimal("10500000.50"), true, null)).thenReturn(corolla());
 
         mvc.perform(actualizacion("{\"precio\":10500000.50,\"disponible\":true}")).andExpect(status().isOk());
-        verify(actualizacion).actualizar(ID, new BigDecimal("10500000.50"), true);
+        verify(actualizacion).actualizar(ID, new BigDecimal("10500000.50"), true, null);
     }
 
     @ParameterizedTest
@@ -290,7 +294,7 @@ class VehiculoControllerEscrituraTest {
         validacion(mvc.perform(actualizacion(cuerpo)))
                 .andExpect(jsonPath("$.errores.length()").value(1))
                 .andExpect(jsonPath("$.errores[0].campo").value("precioODisponible"))
-                .andExpect(jsonPath("$.errores[0].mensaje").value("hay que informar precio, disponible o ambos"));
+                .andExpect(jsonPath("$.errores[0].mensaje").value("hay que informar precio, disponible o patente"));
         verifyNoInteractions(actualizacion);
     }
 
@@ -330,7 +334,7 @@ class VehiculoControllerEscrituraTest {
 
     @Test
     void actualizacionDeUnaUnidadInexistenteResponde404() throws Exception {
-        when(actualizacion.actualizar(ID, new BigDecimal("10500000"), null))
+        when(actualizacion.actualizar(ID, new BigDecimal("10500000"), null, null))
                 .thenThrow(new VehiculoNoEncontradoException(ID));
 
         mvc.perform(actualizacion("{\"precio\":10500000}"))
@@ -341,7 +345,7 @@ class VehiculoControllerEscrituraTest {
 
     @Test
     void actualizacionQueElDominioRechazaResponde422() throws Exception {
-        when(actualizacion.actualizar(ID, new BigDecimal("10500000"), null)).thenThrow(
+        when(actualizacion.actualizar(ID, new BigDecimal("10500000"), null, null)).thenThrow(
                 new DatosInvalidosException(new VehiculoInvalidoException("El precio debe ser mayor que cero")));
 
         validacion(mvc.perform(actualizacion("{\"precio\":10500000}")))
@@ -350,7 +354,7 @@ class VehiculoControllerEscrituraTest {
 
     @Test
     void actualizacionDeUnDatoGuardadoInvalidoResponde500() throws Exception {
-        when(actualizacion.actualizar(ID, new BigDecimal("10500000"), null))
+        when(actualizacion.actualizar(ID, new BigDecimal("10500000"), null, null))
                 .thenThrow(new VehiculoInvalidoException("El año debe estar entre 1950 y 2027"));
 
         String cuerpo = mvc.perform(actualizacion("{\"precio\":10500000}"))

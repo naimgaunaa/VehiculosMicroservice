@@ -40,12 +40,12 @@ class MigracionesTest {
     private JdbcTemplate jdbc;
 
     @Test
-    void flywayAplicoSoloLaV1EnElSchemaVehiculos() {
+    void flywayAplicoLaV1YLaV2EnElSchemaVehiculos() {
         List<String> aplicadas = jdbc.queryForList(
                 "SELECT version FROM " + schema + ".flyway_schema_history WHERE success AND version IS NOT NULL ORDER BY installed_rank",
                 String.class);
 
-        assertThat(aplicadas).containsExactly("1");
+        assertThat(aplicadas).containsExactly("1", "2");
     }
 
     @Test
@@ -55,13 +55,14 @@ class MigracionesTest {
         List<String> indices = jdbc.queryForList(
                 "SELECT indexname FROM pg_indexes WHERE schemaname = ?", String.class, schema);
 
-        assertThat(tablas).contains("vehiculo", "precio_historial");
-        assertThat(indices).contains("ix_vehiculo_disponible", "ix_precio_historial_vehiculo");
+        assertThat(tablas).contains("vehiculo", "precio_historial", "multa");
+        assertThat(indices).contains("ix_vehiculo_disponible", "ix_precio_historial_vehiculo", "ux_vehiculo_patente",
+                "ix_multa_vehiculo");
     }
 
-    /** Lo mismo que declara el SQL de la V1 (sección 9.2 del doc), columna por columna y en orden. */
+    /** Lo mismo que declaran el SQL de la V1 (sección 9.2 del doc) y la V2 (al final), columna por columna y en orden. */
     @Test
-    void lasColumnasDeVehiculoCoincidenConLaV1() {
+    void lasColumnasDeVehiculoCoincidenConLaV1YLaV2() {
         assertThat(describirColumnas("vehiculo")).containsExactly(
                 "id uuid NOT NULL",
                 "marca character varying(60) NOT NULL",
@@ -74,7 +75,23 @@ class MigracionesTest {
                 "caja character varying(15) NOT NULL",
                 "foto_url character varying(500)",
                 "creado_en timestamp with time zone NOT NULL",
-                "actualizado_en timestamp with time zone NOT NULL");
+                "actualizado_en timestamp with time zone NOT NULL",
+                "patente character varying(7)",
+                "multas_consultadas_en timestamp with time zone",
+                "multas_subtotal numeric(14,2)");
+    }
+
+    @Test
+    void lasColumnasDeMultaCoincidenConLaV2() {
+        assertThat(describirColumnas("multa")).containsExactly(
+                "id uuid NOT NULL",
+                "vehiculo_id uuid NOT NULL",
+                "numero_acta character varying(60) NOT NULL",
+                "importe numeric(14,2) NOT NULL",
+                "importe_sin_descuento numeric(14,2)",
+                "tipo_infraccion character varying(500)",
+                "lugar character varying(200)",
+                "juzgado character varying(200)");
     }
 
     @Test
@@ -89,7 +106,7 @@ class MigracionesTest {
     /** Longitud, precisión, escala y nulabilidad de cada {@code @Column} contra la base, que validate no mira. */
     @Test
     void lasEntidadesDeclaranLoMismoQueLaBase() {
-        for (Class<?> entidad : List.of(VehiculoEntity.class, PrecioHistorialEntity.class)) {
+        for (Class<?> entidad : List.of(VehiculoEntity.class, PrecioHistorialEntity.class, MultaEntity.class)) {
             String tabla = entidad.getAnnotation(Table.class).name();
             Map<String, Map<String, Object>> columnas = columnas(tabla).stream()
                     .collect(Collectors.toMap(c -> (String) c.get("column_name"), c -> c));
@@ -166,6 +183,62 @@ class MigracionesTest {
                 "INSERT INTO " + schema + ".precio_historial (id, vehiculo_id, precio, vigente_desde) "
                         + "VALUES (?, ?, 0, now())", UUID.randomUUID(), id))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void variasUnidadesPuedenNoTenerPatenteTodavia() {
+        insertarVehiculo("100000.00", 0, "MANUAL");
+        insertarVehiculo("100000.00", 0, "MANUAL");
+
+        Integer sinPatente = jdbc.queryForObject(
+                "SELECT count(*) FROM " + schema + ".vehiculo WHERE patente IS NULL", Integer.class);
+
+        assertThat(sinPatente).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    void dosUnidadesNoPuedenTenerLaMismaPatente() {
+        UUID primera = insertarVehiculo("100000.00", 0, "MANUAL");
+        UUID segunda = insertarVehiculo("100000.00", 0, "MANUAL");
+        jdbc.update("UPDATE " + schema + ".vehiculo SET patente = 'AB123CD' WHERE id = ?", primera);
+
+        assertThatThrownBy(() -> jdbc.update("UPDATE " + schema + ".vehiculo SET patente = 'AB123CD' WHERE id = ?", segunda))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void elSubtotalDeMultasNoPuedeSerNegativo() {
+        UUID id = insertarVehiculo("100000.00", 0, "MANUAL");
+
+        assertThatThrownBy(() -> jdbc.update("UPDATE " + schema + ".vehiculo SET multas_subtotal = -1 WHERE id = ?", id))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void unaMultaExigeUnaUnidadExistente() {
+        assertThatThrownBy(() -> insertarMulta(UUID.randomUUID(), "A-1", "100.00"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void unaUnidadNoPuedeTenerDosActasConElMismoNumero() {
+        UUID id = insertarVehiculo("100000.00", 0, "MANUAL");
+        insertarMulta(id, "A-1", "100.00");
+        insertarMulta(id, "A-2", "200.00"); // otro número sí
+
+        assertThatThrownBy(() -> insertarMulta(id, "A-1", "200.00")).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void elImporteDeUnaMultaNoPuedeSerNegativo() {
+        UUID id = insertarVehiculo("100000.00", 0, "MANUAL");
+
+        assertThatThrownBy(() -> insertarMulta(id, "A-1", "-1")).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    private void insertarMulta(UUID vehiculoId, String acta, String importe) {
+        jdbc.update("INSERT INTO " + schema + ".multa (id, vehiculo_id, numero_acta, importe) VALUES (?, ?, ?, ?::numeric)",
+                UUID.randomUUID(), vehiculoId, acta, importe);
     }
 
     private List<Map<String, Object>> columnas(String tabla) {

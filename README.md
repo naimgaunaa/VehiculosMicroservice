@@ -28,7 +28,7 @@ Las pasa el responsable de `vehiculos` (Naim Gauna), **solo por mensaje directo 
 
 | Querés… | Tenés que pedir |
 |---|---|
-| Correr los tests (`mvn verify`) | **Nada.** Los tests levantan su propio PostgreSQL con Docker |
+| Correr los tests (`./mvnw verify`) | **Nada.** Los tests levantan su propio PostgreSQL con Docker |
 | Consumir la API de un `vehiculos` que ya está corriendo (desde `calificacion`, el front o el gateway) | **Nada** para leer. La `X-Api-Key` solo si vas a dar de alta o modificar unidades |
 | Levantar el servicio en tu máquina | Las 3 claves de la base: `VEHICULOS_DB_URL`, `VEHICULOS_DB_USUARIO` y `VEHICULOS_DB_CLAVE` |
 | Además, subir fotos | También `VEHICULOS_SUPABASE_URL` y `VEHICULOS_SUPABASE_CLAVE_SECRETA` |
@@ -64,7 +64,8 @@ Las pasa el responsable de `vehiculos` (Naim Gauna), **solo por mensaje directo 
 | Git | Clonar el repo | `git --version` |
 | Docker Desktop (o Docker Engine con Compose v2) | Correr con Docker y correr los tests | `docker compose version` |
 | JDK 21 | Solo para correr con Maven o correr los tests | `java -version` |
-| Maven 3.9 o superior | Solo para correr con Maven o correr los tests. El repo no trae `mvnw` | `mvn -v` |
+
+**No hace falta instalar Maven:** el repo trae el Maven Wrapper (`mvnw` en Linux, macOS y Git Bash; `mvnw.cmd` en Windows). La primera vez descarga Maven 3.9.16 en `~/.m2/wrapper`, verificando su SHA-256, y después lo reusa. La versión se define en `.mvn/wrapper/maven-wrapper.properties`. Si ya tenés Maven instalado, `mvn` también funciona.
 
 Con el camino de Docker no necesitás Java ni Maven: el `Dockerfile` compila dentro del contenedor.
 
@@ -159,7 +160,7 @@ El contenedor siempre usa el perfil `docker` y **nunca** carga datos de prueba e
 
 ## 4. Paso a paso con Maven, sin Docker
 
-Sirve para correr el servicio desde el IDE o la terminal. Necesitás JDK 21 y Maven.
+Sirve para correr el servicio desde el IDE o la terminal. Necesitás JDK 21 (Maven lo trae el wrapper).
 
 ### Paso 1. Crear y completar `infra/.env`
 
@@ -197,8 +198,10 @@ Las variables quedan cargadas solo en esa terminal. Si abrís otra, hay que volv
 En **la misma** terminal:
 
 ```bash
-mvn -pl vehiculos-service spring-boot:run
+./mvnw -pl vehiculos-service spring-boot:run
 ```
+
+En PowerShell: `.\mvnw.cmd -pl vehiculos-service spring-boot:run`.
 
 Usa el perfil `local`, que es el que viene por defecto. Está listo cuando aparece `Started VehiculosApplication`. Para frenarlo, `Ctrl+C`.
 
@@ -270,10 +273,10 @@ Usa el perfil `local`, que es el que viene por defecto. Está listo cuando apare
 
 ## 6. Correr los tests
 
-Necesitás JDK 21, Maven y **Docker abierto**. No hace falta ninguna clave: los tests de integración levantan su propio PostgreSQL con Testcontainers y no tocan Supabase.
+Necesitás JDK 21 y **Docker abierto**. No hace falta ninguna clave: los tests de integración levantan su propio PostgreSQL con Testcontainers y no tocan Supabase.
 
 ```bash
-mvn -pl vehiculos-service -am verify
+./mvnw -pl vehiculos-service -am verify
 ```
 
 Tiene que terminar en `BUILD SUCCESS`. La primera vez descarga la imagen `postgres:17-alpine`.
@@ -281,7 +284,7 @@ Tiene que terminar en `BUILD SUCCESS`. La primera vez descarga la imagen `postgr
 También hay una suite opcional que corre los mismos tests contra Supabase, en el schema `vehiculos_test`, nunca en `vehiculos`. Necesita las claves de la base cargadas en la terminal (sección 4, paso 2):
 
 ```bash
-mvn -pl vehiculos-service -am verify -Psupabase
+./mvnw -pl vehiculos-service -am verify -Psupabase
 ```
 
 ---
@@ -297,14 +300,26 @@ Las rutas de la tabla son las internas del servicio. Detrás del gateway se expo
 | GET | `/vehiculos/{id}/precio` | No | Devuelve `{ "precio": 10000000.00, "disponible": true }` |
 | GET | `/vehiculos/{id}/historial-precios` | No | Precios que rigieron, del más nuevo al más viejo |
 | POST | `/vehiculos` | `X-Api-Key` | Alta de una unidad. Responde 201 con `Location` |
-| PUT | `/vehiculos/{id}` | `X-Api-Key` | Cambia `precio`, `disponible` o los dos (al menos uno) |
+| PUT | `/vehiculos/{id}` | `X-Api-Key` | Cambia `precio`, `disponible`, `patente` (al menos uno). Una patente nueva descarta las multas de la anterior |
+| PUT | `/vehiculos/{id}/multas` | `X-Api-Key` | Registra el resultado de la consulta de multas (lo llama el orquestador). Responde 204. Reemplaza el anterior, es idempotente |
+| GET | `/vehiculos/{id}/multas` | `X-Api-Key` | Subtotal, fecha de la consulta y actas de la última consulta. Con clave: son datos personales asociados a una patente |
 | PUT | `/vehiculos/{id}/foto` | `X-Api-Key` | Carga la foto. Multipart con el campo `archivo`: JPEG, PNG o WebP de hasta 2 MB |
 
 Formato de los campos:
 
 - `caja` viaja como `AUTOMATICA` o `MANUAL`.
 - `precio` es un número con 2 decimales.
-- `version` y `fotoUrl` pueden llegar en `null`.
+- `version`, `fotoUrl` y `patente` pueden llegar en `null`.
+- `patente` (opcional en el alta) se normaliza: sin espacios ni guiones y en mayúsculas. Formatos `AAA123` o `AB123CD`. No puede repetirse entre unidades (`409 PATENTE_DUPLICADA`).
+
+### 7.1 Multas
+
+Flujo `CONSULTA_MULTAS_VEHICULO` del orquestador (docs/08 §7 de su repositorio): el servicio `multas` consulta la ANSV por patente y el orquestador entrega acá el resultado.
+
+- `GET /vehiculos/{id}` devuelve `patente` (el orquestador la lee para pedir la consulta; sin patente la consulta no se puede pedir).
+- `PUT /vehiculos/{id}/multas` recibe `{ dominio, infracciones: [{ numeroActa, dominio, importe, importeSinDescuento, tipoInfraccion, lugar, juzgado }], subtotal, mensaje? }`. `dominio` es opcional; si viene tiene que coincidir con la patente de la unidad (`409 PATENTE_NO_COINCIDE`). La unidad tiene que tener patente (`409 PATENTE_NO_COINCIDE`). Actas con el mismo número: `422`. Una patente sin multas manda `infracciones: []` y `subtotal: 0`.
+- Lo que se guarda: el subtotal y la fecha de la última consulta en la unidad, y las actas en la tabla `multa`. Cada resultado reemplaza al anterior.
+- **Las multas no aparecen en `GET /vehiculos` ni en `GET /vehiculos/{id}`**: se leen solo con `GET /vehiculos/{id}/multas` y la clave de servicio. Qué significa tener multas (marcar la unidad, afectar el precio, etc.) lo decide vehiculos; por ahora solo las guarda.
 
 Los errores salen como `application/problem+json` y traen:
 
@@ -337,6 +352,7 @@ El servicio acepta el header `X-Correlation-Id` y lo devuelve en la respuesta. S
 ## 9. Reglas para no romper la base compartida
 
 - **No agregues ni edites migraciones** (`vehiculos-service/src/main/resources/db/migration`). Solo el responsable migra la base compartida. Si tu rama trae una migración nueva, Flyway la aplica al arrancar y deja sin servicio a los demás.
+- **La `V2__patente_y_multas.sql` está en la rama `feat/patente-y-multas`** (agrega `vehiculo.patente`, el subtotal y la fecha de multas, y la tabla `multa`). No arranques esa rama contra la base compartida: la aplica el responsable cuando decida mergear. Los tests la corren en un PostgreSQL de Testcontainers.
 - **No actives el perfil `seed` contra Supabase.** Los datos de prueba ya están cargados.
 - **Usá solo datos ficticios** en las altas y en las fotos.
 - **No subas nunca `infra/.env`** ni pegues claves en issues, PRs, chats grupales o capturas. Si se filtró alguna, avisá enseguida para rotarla.

@@ -6,6 +6,7 @@ import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.uade.crm.vehiculos.domain.model.PatenteDuplicadaException;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
 import com.uade.crm.vehiculos.domain.model.VehiculoInvalidoException;
 import com.uade.crm.vehiculos.domain.port.VehiculoRepositorio;
@@ -24,6 +25,11 @@ public class AltaVehiculoService {
     @Transactional
     public Vehiculo registrar(AltaVehiculo alta) {
         Vehiculo vehiculo = construir(alta);
+        vehiculo.patente().ifPresent(patente -> {
+            if (repositorio.existeOtraConPatente(patente, vehiculo.id())) {
+                throw new PatenteDuplicadaException(patente);
+            }
+        });
         Instant ahora = clock.instant();
         Vehiculo guardado = repositorio.guardar(vehiculo);
         repositorio.registrarPrecio(guardado.id(), guardado.precio(), ahora);
@@ -41,6 +47,7 @@ public class AltaVehiculoService {
                     .precio(alta.precio())
                     .disponible(alta.disponible())
                     .caja(alta.caja())
+                    .patente(alta.patente())
                     .build();
         } catch (VehiculoInvalidoException e) {
             throw new DatosInvalidosException(e);
