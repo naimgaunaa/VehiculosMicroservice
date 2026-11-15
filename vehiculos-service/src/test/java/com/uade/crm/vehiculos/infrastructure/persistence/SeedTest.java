@@ -39,8 +39,8 @@ class SeedTest {
         List<Map<String, Object>> aplicadas = jdbc.queryForList(
                 "SELECT version, script FROM " + schema + ".flyway_schema_history WHERE success AND type = 'SQL' ORDER BY installed_rank");
 
-        assertThat(aplicadas).extracting(fila -> fila.get("version")).containsExactly("1", null);
-        assertThat(aplicadas.get(1).get("script")).isEqualTo("R__seed_vehiculos.sql");
+        assertThat(aplicadas).extracting(fila -> fila.get("version")).containsExactly("1", "2", null);
+        assertThat(aplicadas.get(2).get("script")).isEqualTo("R__seed_vehiculos.sql");
     }
 
     @Test

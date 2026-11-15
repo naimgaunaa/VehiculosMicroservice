@@ -17,6 +17,8 @@ public enum CodigoError {
     ERROR_INTERNO(HttpStatus.INTERNAL_SERVER_ERROR, "error-interno", "Error interno"),
     VEHICULO_NO_ENCONTRADO(HttpStatus.NOT_FOUND, "vehiculo-no-encontrado", "Vehículo no encontrado"),
     FOTO_INVALIDA(HttpStatus.UNPROCESSABLE_ENTITY, "foto-invalida", "Foto inválida"),
+    PATENTE_DUPLICADA(HttpStatus.CONFLICT, "patente-duplicada", "Patente duplicada"),
+    PATENTE_NO_COINCIDE(HttpStatus.CONFLICT, "patente-no-coincide", "La patente no coincide"),
     ALMACENAMIENTO_NO_DISPONIBLE(HttpStatus.SERVICE_UNAVAILABLE, "almacenamiento-no-disponible",
             "Almacenamiento no disponible");
 

@@ -200,6 +200,21 @@ class CarreraDePutsTest {
                 public List<PrecioHistorico> historialDePrecios(UUID vehiculoId) {
                     return real.historialDePrecios(vehiculoId);
                 }
+
+                @Override
+                public boolean existeOtraConPatente(String patente, UUID exceptoId) {
+                    return real.existeOtraConPatente(patente, exceptoId);
+                }
+
+                @Override
+                public void reemplazarMultas(UUID vehiculoId, List<com.uade.crm.vehiculos.domain.model.Multa> multas) {
+                    real.reemplazarMultas(vehiculoId, multas);
+                }
+
+                @Override
+                public List<com.uade.crm.vehiculos.domain.model.Multa> multasDe(UUID vehiculoId) {
+                    return real.multasDe(vehiculoId);
+                }
             };
         }
     }

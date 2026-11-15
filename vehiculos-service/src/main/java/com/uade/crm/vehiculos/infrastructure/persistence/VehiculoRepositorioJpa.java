@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.uade.crm.vehiculos.domain.model.Multa;
 import com.uade.crm.vehiculos.domain.model.PrecioHistorico;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
 import com.uade.crm.vehiculos.domain.port.VehiculoRepositorio;
@@ -34,11 +35,14 @@ class VehiculoRepositorioJpa implements VehiculoRepositorio {
 
     private final VehiculoJpaRepository vehiculos;
     private final PrecioHistorialJpaRepository historial;
+    private final MultaJpaRepository multas;
     private final Clock clock;
 
-    VehiculoRepositorioJpa(VehiculoJpaRepository vehiculos, PrecioHistorialJpaRepository historial, Clock clock) {
+    VehiculoRepositorioJpa(VehiculoJpaRepository vehiculos, PrecioHistorialJpaRepository historial, MultaJpaRepository multas,
+            Clock clock) {
         this.vehiculos = vehiculos;
         this.historial = historial;
+        this.multas = multas;
         this.clock = clock;
     }
 
@@ -94,6 +98,31 @@ class VehiculoRepositorioJpa implements VehiculoRepositorio {
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existeOtraConPatente(String patente, UUID exceptoId) {
+        return vehiculos.existsByPatenteAndIdNot(patente, exceptoId);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void reemplazarMultas(UUID vehiculoId, List<Multa> nuevas) {
+        multas.borrarDe(vehiculoId);
+        multas.saveAllAndFlush(nuevas.stream()
+                .map(m -> new MultaEntity(UUID.randomUUID(), vehiculoId, m.numeroActa(), m.importe(), m.importeSinDescuento(),
+                        m.tipoInfraccion(), m.lugar(), m.juzgado()))
+                .toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Multa> multasDe(UUID vehiculoId) {
+        return multas.findByVehiculoIdOrderByNumeroActaAsc(vehiculoId).stream()
+                .map(e -> new Multa(e.getNumeroActa(), e.getImporte(), e.getImporteSinDescuento(), e.getTipoInfraccion(), e.getLugar(),
+                        e.getJuzgado()))
+                .toList();
+    }
+
     /** Copia los campos del dominio sobre la entidad; no toca {@code creadoEn} ni {@code actualizadoEn}. */
     static void aEntidad(Vehiculo vehiculo, VehiculoEntity entidad) {
         entidad.setId(vehiculo.id());
@@ -106,6 +135,9 @@ class VehiculoRepositorioJpa implements VehiculoRepositorio {
         entidad.setDisponible(vehiculo.disponible());
         entidad.setCaja(vehiculo.caja());
         entidad.setFotoUrl(vehiculo.fotoUrl().orElse(null));
+        entidad.setPatente(vehiculo.patente().orElse(null));
+        entidad.setMultasConsultadasEn(vehiculo.multasConsultadasEn().orElse(null));
+        entidad.setMultasSubtotal(vehiculo.multasSubtotal().orElse(null));
     }
 
     static Vehiculo aDominio(VehiculoEntity entidad, Clock clock) {
@@ -120,6 +152,8 @@ class VehiculoRepositorioJpa implements VehiculoRepositorio {
                 .disponible(entidad.isDisponible())
                 .caja(entidad.getCaja())
                 .fotoUrl(entidad.getFotoUrl())
+                .patente(entidad.getPatente())
+                .multas(entidad.getMultasConsultadasEn(), entidad.getMultasSubtotal())
                 .build();
     }
 }

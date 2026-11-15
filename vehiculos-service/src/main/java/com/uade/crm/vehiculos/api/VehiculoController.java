@@ -30,6 +30,8 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.uade.crm.vehiculos.api.dto.ActualizacionVehiculoRequest;
 import com.uade.crm.vehiculos.api.dto.AltaVehiculoRequest;
+import com.uade.crm.vehiculos.api.dto.MultasRequest;
+import com.uade.crm.vehiculos.api.dto.MultasResponse;
 import com.uade.crm.vehiculos.api.dto.PrecioHistoricoResponse;
 import com.uade.crm.vehiculos.api.dto.PrecioResponse;
 import com.uade.crm.vehiculos.api.dto.VehiculoResponse;
@@ -39,7 +41,9 @@ import com.uade.crm.vehiculos.application.AltaVehiculo;
 import com.uade.crm.vehiculos.application.AltaVehiculoService;
 import com.uade.crm.vehiculos.application.ConsultaVehiculoService;
 import com.uade.crm.vehiculos.application.FotoVehiculoService;
+import com.uade.crm.vehiculos.application.MultasVehiculoService;
 import com.uade.crm.vehiculos.config.OpenApiConfig;
+import com.uade.crm.vehiculos.domain.model.Multa;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
 
 @RestController
@@ -53,13 +57,15 @@ public class VehiculoController {
     private final AltaVehiculoService alta;
     private final ActualizacionVehiculoService actualizacion;
     private final FotoVehiculoService fotos;
+    private final MultasVehiculoService multas;
 
     public VehiculoController(ConsultaVehiculoService consulta, AltaVehiculoService alta,
-            ActualizacionVehiculoService actualizacion, FotoVehiculoService fotos) {
+            ActualizacionVehiculoService actualizacion, FotoVehiculoService fotos, MultasVehiculoService multas) {
         this.consulta = consulta;
         this.alta = alta;
         this.actualizacion = actualizacion;
         this.fotos = fotos;
+        this.multas = multas;
     }
 
     @GetMapping
@@ -129,7 +135,7 @@ public class VehiculoController {
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<VehiculoResponse> registrar(@Valid @RequestBody AltaVehiculoRequest pedido) {
         Vehiculo vehiculo = alta.registrar(new AltaVehiculo(pedido.marca(), pedido.modelo(), pedido.version(),
-                pedido.anio(), pedido.kilometraje(), pedido.precio(), pedido.disponible(), pedido.caja()));
+                pedido.anio(), pedido.kilometraje(), pedido.precio(), pedido.disponible(), pedido.caja(), pedido.patente()));
         URI ubicacion = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
                 .buildAndExpand(vehiculo.id())
@@ -140,8 +146,9 @@ public class VehiculoController {
     @PutMapping("/{id}")
     @RequiereClaveServicio
     @SecurityRequirement(name = OpenApiConfig.ESQUEMA_CLAVE_SERVICIO)
-    @Operation(summary = "Cambia el precio y/o la disponibilidad",
-            description = "Al menos uno de los dos. Si cambia el precio, lo registra en el historial.")
+    @Operation(summary = "Cambia el precio, la disponibilidad y/o la patente",
+            description = "Al menos uno de los tres. Si cambia el precio, lo registra en el historial. Si cambia la patente, "
+                    + "descarta las multas de la anterior.")
     @ApiResponse(responseCode = "200", description = "La unidad actualizada")
     @ApiResponse(responseCode = "400", description = "JSON mal formado o id que no es UUID (JSON_INVALIDO, SOLICITUD_INVALIDA)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
@@ -149,12 +156,60 @@ public class VehiculoController {
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "404", description = "No existe la unidad (VEHICULO_NO_ENCONTRADO)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", description = "Otra unidad ya tiene esa patente (PATENTE_DUPLICADA)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "422", description = "Datos inválidos o campos no admitidos (VALIDACION)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "500", description = "Error interno (ERROR_INTERNO)",
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
     public VehiculoResponse actualizar(@PathVariable UUID id, @Valid @RequestBody ActualizacionVehiculoRequest pedido) {
-        return VehiculoResponse.de(actualizacion.actualizar(id, pedido.precio(), pedido.disponible()));
+        return VehiculoResponse.de(actualizacion.actualizar(id, pedido.precio(), pedido.disponible(), pedido.patente()));
+    }
+
+    @PutMapping("/{id}/multas")
+    @RequiereClaveServicio
+    @SecurityRequirement(name = OpenApiConfig.ESQUEMA_CLAVE_SERVICIO)
+    @Operation(summary = "Registra el resultado de la consulta de multas",
+            description = "Lo llama el orquestador con lo que informó el servicio `multas`. Reemplaza el resultado anterior: "
+                    + "es idempotente. La unidad tiene que tener patente y, si el cuerpo trae `dominio`, coincidir con ella.")
+    @ApiResponse(responseCode = "204", description = "Resultado guardado")
+    @ApiResponse(responseCode = "400", description = "JSON mal formado o id que no es UUID (JSON_INVALIDO, SOLICITUD_INVALIDA)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "401", description = "Falta `X-Api-Key` o no es válida (CLAVE_SERVICIO_INVALIDA)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "404", description = "No existe la unidad (VEHICULO_NO_ENCONTRADO)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", description = "La unidad no tiene patente o las multas son de otra (PATENTE_NO_COINCIDE)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "422", description = "Datos inválidos o actas repetidas (VALIDACION)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "500", description = "Error interno (ERROR_INTERNO)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    public ResponseEntity<Void> registrarMultas(@PathVariable UUID id, @Valid @RequestBody MultasRequest pedido) {
+        multas.registrar(id, pedido.dominio(), pedido.subtotal(), pedido.infracciones().stream()
+                .map(i -> new Multa(i.numeroActa().strip(), i.importe(), i.importeSinDescuento(), i.tipoInfraccion(),
+                        i.lugar(), i.juzgado()))
+                .toList());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/multas")
+    @RequiereClaveServicio
+    @SecurityRequirement(name = OpenApiConfig.ESQUEMA_CLAVE_SERVICIO)
+    @Operation(summary = "Multas de la última consulta",
+            description = "Con la clave de servicio: son datos personales asociados a una patente. Si la unidad nunca se "
+                    + "consultó devuelve `consultadasEn: null` y sin actas.")
+    @ApiResponse(responseCode = "200", description = "Subtotal, fecha de la consulta y actas")
+    @ApiResponse(responseCode = "400", description = "El id no es un UUID (SOLICITUD_INVALIDA)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "401", description = "Falta `X-Api-Key` o no es válida (CLAVE_SERVICIO_INVALIDA)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "404", description = "No existe la unidad (VEHICULO_NO_ENCONTRADO)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "500", description = "Error interno (ERROR_INTERNO)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(implementation = ProblemDetail.class)))
+    public MultasResponse multas(@PathVariable UUID id) {
+        return MultasResponse.de(multas.obtener(id));
     }
 
     @PutMapping("/{id}/foto")

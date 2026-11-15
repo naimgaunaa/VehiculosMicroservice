@@ -22,12 +22,14 @@ public record AltaVehiculoRequest(
         @Schema(example = "45000") @NotNull @PositiveOrZero Integer kilometraje,
         @Schema(example = "10000000") @NotNull @Positive @Digits(integer = 12, fraction = 2) BigDecimal precio,
         @Schema(defaultValue = "true") Boolean disponible,
-        @NotNull Caja caja) {
+        @NotNull Caja caja,
+        @Schema(example = "AB123CD", nullable = true) @Size(max = 12) String patente) {
 
     public AltaVehiculoRequest {
         marca = recortar(marca);
         modelo = recortar(modelo);
         version = recortar(version);
+        patente = recortar(patente);
         disponible = disponible == null ? Boolean.TRUE : disponible;
     }
 

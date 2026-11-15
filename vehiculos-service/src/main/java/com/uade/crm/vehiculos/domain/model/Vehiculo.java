@@ -2,6 +2,7 @@ package com.uade.crm.vehiculos.domain.model;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.Year;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,6 +29,9 @@ public final class Vehiculo {
     private boolean disponible;
     private final Caja caja;
     private String fotoUrl;
+    private String patente;
+    private Instant multasConsultadasEn;
+    private BigDecimal multasSubtotal;
 
     private Vehiculo(Builder builder, int anio, int kilometraje, BigDecimal precio) {
         this.id = builder.id != null ? builder.id : UUID.randomUUID();
@@ -40,6 +44,9 @@ public final class Vehiculo {
         this.disponible = builder.disponible;
         this.caja = builder.caja;
         this.fotoUrl = builder.fotoUrl;
+        this.patente = builder.patente;
+        this.multasConsultadasEn = builder.multasConsultadasEn;
+        this.multasSubtotal = builder.multasSubtotal;
     }
 
     /** El {@code clock} fija el año actual contra el que se valida {@code anio}. */
@@ -87,12 +94,49 @@ public final class Vehiculo {
         return Optional.ofNullable(fotoUrl);
     }
 
+    /** Vacía hasta que se carga: las unidades anteriores a la V2 no la tienen. */
+    public Optional<String> patente() {
+        return Optional.ofNullable(patente);
+    }
+
+    /** Cuándo se consultaron por última vez las multas; vacío si nunca se consultaron. */
+    public Optional<Instant> multasConsultadasEn() {
+        return Optional.ofNullable(multasConsultadasEn);
+    }
+
+    /** Suma de las actas de la última consulta (sin descuento); vacío si nunca se consultaron. */
+    public Optional<BigDecimal> multasSubtotal() {
+        return Optional.ofNullable(multasSubtotal);
+    }
+
     public void actualizarPrecio(BigDecimal nuevoPrecio) {
         this.precio = validarPrecio(nuevoPrecio);
     }
 
     public void cambiarDisponibilidad(boolean disponible) {
         this.disponible = disponible;
+    }
+
+    /**
+     * Asigna la patente (normalizada). Si cambia, el resultado de multas que había era de otra patente: se descarta.
+     */
+    public void asignarPatente(String nueva) {
+        String normalizada = Patente.normalizar(nueva);
+        if (!normalizada.equals(this.patente)) {
+            this.patente = normalizada;
+            this.multasConsultadasEn = null;
+            this.multasSubtotal = null;
+        }
+    }
+
+    /** Anota el resultado de una consulta de multas. */
+    public void registrarMultas(Instant consultadasEn, BigDecimal subtotal) {
+        Objects.requireNonNull(consultadasEn, "La fecha de la consulta es obligatoria");
+        if (subtotal == null || subtotal.signum() < 0) {
+            throw new VehiculoInvalidoException("El subtotal de multas no puede ser negativo");
+        }
+        this.multasConsultadasEn = consultadasEn;
+        this.multasSubtotal = subtotal.setScale(DECIMALES_PRECIO, java.math.RoundingMode.HALF_UP);
     }
 
     public void asignarFoto(String url) {
@@ -139,6 +183,9 @@ public final class Vehiculo {
         private boolean disponible = true;
         private Caja caja;
         private String fotoUrl;
+        private String patente;
+        private Instant multasConsultadasEn;
+        private BigDecimal multasSubtotal;
 
         private Builder(Clock clock) {
             this.clock = clock;
@@ -194,6 +241,19 @@ public final class Vehiculo {
 
         public Builder fotoUrl(String fotoUrl) {
             this.fotoUrl = fotoUrl;
+            return this;
+        }
+
+        /** Opcional. Un texto en blanco equivale a no informarla; si viene, tiene que ser una patente válida. */
+        public Builder patente(String patente) {
+            this.patente = patente == null || patente.isBlank() ? null : Patente.normalizar(patente);
+            return this;
+        }
+
+        /** Resultado de la última consulta de multas (la persistencia lo informa al reconstruir). */
+        public Builder multas(Instant consultadasEn, BigDecimal subtotal) {
+            this.multasConsultadasEn = consultadasEn;
+            this.multasSubtotal = subtotal;
             return this;
         }
 

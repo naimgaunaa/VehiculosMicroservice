@@ -12,5 +12,12 @@ public record AltaVehiculo(
         int kilometraje,
         BigDecimal precio,
         boolean disponible,
-        Caja caja) {
+        Caja caja,
+        String patente) {
+
+    /** Alta sin patente (se puede cargar después con {@code PUT /vehiculos/{id}}). */
+    public AltaVehiculo(String marca, String modelo, String version, int anio, int kilometraje, BigDecimal precio,
+            boolean disponible, Caja caja) {
+        this(marca, modelo, version, anio, kilometraje, precio, disponible, caja, null);
+    }
 }
