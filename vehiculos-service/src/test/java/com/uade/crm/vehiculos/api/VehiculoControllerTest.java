@@ -27,6 +27,7 @@ import com.uade.crm.vehiculos.application.ActualizacionVehiculoService;
 import com.uade.crm.vehiculos.application.AltaVehiculoService;
 import com.uade.crm.vehiculos.application.ConsultaVehiculoService;
 import com.uade.crm.vehiculos.application.FotoVehiculoService;
+import com.uade.crm.vehiculos.application.MultasVehiculoService;
 import com.uade.crm.vehiculos.domain.model.Caja;
 import com.uade.crm.vehiculos.domain.model.PrecioHistorico;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
@@ -54,6 +55,9 @@ class VehiculoControllerTest {
 
     @MockitoBean
     private FotoVehiculoService fotos;
+
+    @MockitoBean
+    private MultasVehiculoService multasVehiculo;
 
     @Test
     void listarSinFiltroDevuelveTodasLasUnidades() throws Exception {

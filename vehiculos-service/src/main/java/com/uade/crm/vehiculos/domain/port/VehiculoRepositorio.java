@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uade.crm.vehiculos.domain.model.Multa;
 import com.uade.crm.vehiculos.domain.model.PrecioHistorico;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
 
@@ -39,4 +40,13 @@ public interface VehiculoRepositorio {
 
     /** Precios que rigieron para la unidad, del más nuevo al más viejo. Vacío si no tiene filas. */
     List<PrecioHistorico> historialDePrecios(UUID vehiculoId);
+
+    /** Si otra unidad (distinta de {@code exceptoId}) ya tiene esa patente (ya normalizada). */
+    boolean existeOtraConPatente(String patente, UUID exceptoId);
+
+    /** Reemplaza las actas de la unidad por las informadas (las anteriores se borran). Exige transacción abierta. */
+    void reemplazarMultas(UUID vehiculoId, List<Multa> multas);
+
+    /** Actas de la última consulta, ordenadas por número de acta. Vacío si no hay. */
+    List<Multa> multasDe(UUID vehiculoId);
 }

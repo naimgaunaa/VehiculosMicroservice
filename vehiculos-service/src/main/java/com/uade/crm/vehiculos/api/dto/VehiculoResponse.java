@@ -19,7 +19,8 @@ public record VehiculoResponse(
         @Schema(example = "10000000.00") BigDecimal precio,
         boolean disponible,
         Caja caja,
-        @Schema(nullable = true) String fotoUrl) {
+        @Schema(nullable = true) String fotoUrl,
+        @Schema(example = "AB123CD", nullable = true) String patente) {
 
     public static VehiculoResponse de(Vehiculo vehiculo) {
         return new VehiculoResponse(
@@ -32,6 +33,7 @@ public record VehiculoResponse(
                 Precios.aEscala2(vehiculo.precio()),
                 vehiculo.disponible(),
                 vehiculo.caja(),
-                vehiculo.fotoUrl().orElse(null));
+                vehiculo.fotoUrl().orElse(null),
+                vehiculo.patente().orElse(null));
     }
 }

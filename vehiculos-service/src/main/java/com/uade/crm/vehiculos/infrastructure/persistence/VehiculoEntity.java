@@ -61,6 +61,15 @@ class VehiculoEntity implements Persistable<UUID> {
     @Column(name = "foto_url", length = 500)
     private String fotoUrl;
 
+    @Column(name = "patente", length = 7)
+    private String patente;
+
+    @Column(name = "multas_consultadas_en")
+    private Instant multasConsultadasEn;
+
+    @Column(name = "multas_subtotal", precision = 14, scale = 2)
+    private BigDecimal multasSubtotal;
+
     @Column(name = "creado_en", nullable = false, updatable = false)
     private Instant creadoEn;
 
@@ -172,6 +181,30 @@ class VehiculoEntity implements Persistable<UUID> {
 
     void setFotoUrl(String fotoUrl) {
         this.fotoUrl = fotoUrl;
+    }
+
+    String getPatente() {
+        return patente;
+    }
+
+    void setPatente(String patente) {
+        this.patente = patente;
+    }
+
+    Instant getMultasConsultadasEn() {
+        return multasConsultadasEn;
+    }
+
+    void setMultasConsultadasEn(Instant multasConsultadasEn) {
+        this.multasConsultadasEn = multasConsultadasEn;
+    }
+
+    BigDecimal getMultasSubtotal() {
+        return multasSubtotal;
+    }
+
+    void setMultasSubtotal(BigDecimal multasSubtotal) {
+        this.multasSubtotal = multasSubtotal;
     }
 
     Instant getCreadoEn() {

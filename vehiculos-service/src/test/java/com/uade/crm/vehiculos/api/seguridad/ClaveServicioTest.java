@@ -35,6 +35,7 @@ import com.uade.crm.vehiculos.application.ActualizacionVehiculoService;
 import com.uade.crm.vehiculos.application.AltaVehiculoService;
 import com.uade.crm.vehiculos.application.ConsultaVehiculoService;
 import com.uade.crm.vehiculos.application.FotoVehiculoService;
+import com.uade.crm.vehiculos.application.MultasVehiculoService;
 import com.uade.crm.vehiculos.domain.model.Caja;
 import com.uade.crm.vehiculos.domain.model.Vehiculo;
 
@@ -63,6 +64,9 @@ class ClaveServicioTest {
 
     @MockitoBean
     private FotoVehiculoService fotos;
+
+    @MockitoBean
+    private MultasVehiculoService multasVehiculo;
 
     @Test
     void altaSinClaveResponde401() throws Exception {
@@ -100,7 +104,7 @@ class ClaveServicioTest {
 
     @Test
     void actualizacionConClaveCorrectaLlegaAlServicio() throws Exception {
-        when(actualizacion.actualizar(ID, new BigDecimal("10500000"), null)).thenReturn(vehiculo());
+        when(actualizacion.actualizar(ID, new BigDecimal("10500000"), null, null)).thenReturn(vehiculo());
 
         mvc.perform(json(put("/vehiculos/{id}", ID), "{\"precio\":10500000}").header("X-Api-Key", CLAVE))
                 .andExpect(status().isOk());

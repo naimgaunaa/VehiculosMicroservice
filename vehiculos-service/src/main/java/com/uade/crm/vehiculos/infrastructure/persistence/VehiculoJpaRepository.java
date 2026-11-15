@@ -14,6 +14,8 @@ interface VehiculoJpaRepository extends JpaRepository<VehiculoEntity, UUID> {
 
     List<VehiculoEntity> findByDisponible(boolean disponible, Sort orden);
 
+    boolean existsByPatenteAndIdNot(String patente, UUID id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<VehiculoEntity> findParaActualizarById(UUID id);
 }

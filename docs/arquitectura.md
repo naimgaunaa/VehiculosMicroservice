@@ -446,6 +446,10 @@ CREATE INDEX ix_precio_historial_vehiculo ON precio_historial (vehiculo_id, vige
 
 Cada fila de `precio_historial` es un precio que empezó a regir en `vigente_desde`. La clave foránea es válida porque ambas tablas son de este servicio: la regla de no usar claves foráneas aplica entre servicios.
 
+### 9.2 bis Migración V2: patente y multas
+
+`V2__patente_y_multas.sql` agrega a `vehiculo` las columnas `patente VARCHAR(7)` (opcional, con índice único parcial `ux_vehiculo_patente`), `multas_consultadas_en TIMESTAMPTZ` y `multas_subtotal NUMERIC(14,2)` (no negativo), y crea la tabla `multa` (`id`, `vehiculo_id`, `numero_acta`, `importe`, `importe_sin_descuento`, `tipo_infraccion`, `lugar`, `juzgado`, con `UNIQUE (vehiculo_id, numero_acta)`). Las unidades anteriores quedan sin patente. Las actas son datos personales asociados a una patente: solo se exponen con la clave de servicio.
+
 ### 9.3 Seed
 
 La carga inicial vive en `vehiculos-service/src/main/resources/db/seed/R__seed_vehiculos.sql`, separada de `db/migration/`. Se activa con el perfil `seed`: `application-seed.yml` fija `spring.flyway.locations: classpath:db/migration,classpath:db/seed` (repite `db/migration` porque las listas de YAML se reemplazan, no se mezclan). Se corre con `SPRING_PROFILES_ACTIVE=local,seed`; solo `seed` dejaría al perfil `local` sin cargar y faltaría el datasource.

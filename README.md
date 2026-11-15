@@ -300,14 +300,26 @@ Las rutas de la tabla son las internas del servicio. Detrás del gateway se expo
 | GET | `/vehiculos/{id}/precio` | No | Devuelve `{ "precio": 10000000.00, "disponible": true }` |
 | GET | `/vehiculos/{id}/historial-precios` | No | Precios que rigieron, del más nuevo al más viejo |
 | POST | `/vehiculos` | `X-Api-Key` | Alta de una unidad. Responde 201 con `Location` |
-| PUT | `/vehiculos/{id}` | `X-Api-Key` | Cambia `precio`, `disponible` o los dos (al menos uno) |
+| PUT | `/vehiculos/{id}` | `X-Api-Key` | Cambia `precio`, `disponible`, `patente` (al menos uno). Una patente nueva descarta las multas de la anterior |
+| PUT | `/vehiculos/{id}/multas` | `X-Api-Key` | Registra el resultado de la consulta de multas (lo llama el orquestador). Responde 204. Reemplaza el anterior, es idempotente |
+| GET | `/vehiculos/{id}/multas` | `X-Api-Key` | Subtotal, fecha de la consulta y actas de la última consulta. Con clave: son datos personales asociados a una patente |
 | PUT | `/vehiculos/{id}/foto` | `X-Api-Key` | Carga la foto. Multipart con el campo `archivo`: JPEG, PNG o WebP de hasta 2 MB |
 
 Formato de los campos:
 
 - `caja` viaja como `AUTOMATICA` o `MANUAL`.
 - `precio` es un número con 2 decimales.
-- `version` y `fotoUrl` pueden llegar en `null`.
+- `version`, `fotoUrl` y `patente` pueden llegar en `null`.
+- `patente` (opcional en el alta) se normaliza: sin espacios ni guiones y en mayúsculas. Formatos `AAA123` o `AB123CD`. No puede repetirse entre unidades (`409 PATENTE_DUPLICADA`).
+
+### 7.1 Multas
+
+Flujo `CONSULTA_MULTAS_VEHICULO` del orquestador (docs/08 §7 de su repositorio): el servicio `multas` consulta la ANSV por patente y el orquestador entrega acá el resultado.
+
+- `GET /vehiculos/{id}` devuelve `patente` (el orquestador la lee para pedir la consulta; sin patente la consulta no se puede pedir).
+- `PUT /vehiculos/{id}/multas` recibe `{ dominio, infracciones: [{ numeroActa, dominio, importe, importeSinDescuento, tipoInfraccion, lugar, juzgado }], subtotal, mensaje? }`. `dominio` es opcional; si viene tiene que coincidir con la patente de la unidad (`409 PATENTE_NO_COINCIDE`). La unidad tiene que tener patente (`409 PATENTE_NO_COINCIDE`). Actas con el mismo número: `422`. Una patente sin multas manda `infracciones: []` y `subtotal: 0`.
+- Lo que se guarda: el subtotal y la fecha de la última consulta en la unidad, y las actas en la tabla `multa`. Cada resultado reemplaza al anterior.
+- **Las multas no aparecen en `GET /vehiculos` ni en `GET /vehiculos/{id}`**: se leen solo con `GET /vehiculos/{id}/multas` y la clave de servicio. Qué significa tener multas (marcar la unidad, afectar el precio, etc.) lo decide vehiculos; por ahora solo las guarda.
 
 Los errores salen como `application/problem+json` y traen:
 
@@ -340,6 +352,7 @@ El servicio acepta el header `X-Correlation-Id` y lo devuelve en la respuesta. S
 ## 9. Reglas para no romper la base compartida
 
 - **No agregues ni edites migraciones** (`vehiculos-service/src/main/resources/db/migration`). Solo el responsable migra la base compartida. Si tu rama trae una migración nueva, Flyway la aplica al arrancar y deja sin servicio a los demás.
+- **La `V2__patente_y_multas.sql` está en la rama `feat/patente-y-multas`** (agrega `vehiculo.patente`, el subtotal y la fecha de multas, y la tabla `multa`). No arranques esa rama contra la base compartida: la aplica el responsable cuando decida mergear. Los tests la corren en un PostgreSQL de Testcontainers.
 - **No actives el perfil `seed` contra Supabase.** Los datos de prueba ya están cargados.
 - **Usá solo datos ficticios** en las altas y en las fotos.
 - **No subas nunca `infra/.env`** ni pegues claves en issues, PRs, chats grupales o capturas. Si se filtró alguna, avisá enseguida para rotarla.
